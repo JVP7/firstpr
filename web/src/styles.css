@@ -239,3 +239,12 @@ button, input, select { font: inherit; color: inherit; }
 .prose .section p { font-size: 15px; max-width: 70ch; }
 .settings .section form .btn { justify-self: start; }
 .danger-row p + p { margin-top: 8px; }
+
+/* New-password checklist */
+.pw-rules { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.pw-rules li { display: flex; align-items: center; gap: 6px; }
+.pw-rules li svg { flex: none; opacity: 0.5; }
+.pw-rules li.met { color: var(--match); }
+.pw-rules li.met svg { opacity: 1; }
+.pw-rules li.note { color: var(--muted); }
+.pw-rules li.note svg { opacity: 1; }

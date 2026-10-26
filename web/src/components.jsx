@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { IssueOpenedIcon, StarIcon } from '@primer/octicons-react'
+import { CheckIcon, DotFillIcon, IssueOpenedIcon, ShieldCheckIcon, StarIcon } from '@primer/octicons-react'
 
 // GitHub linguist colors for the languages in the seed list.
 const LANG_COLORS = { Python: '#3572A5', JavaScript: '#f1e05a', TypeScript: '#3178c6', 'Jupyter Notebook': '#DA5B0B', HTML: '#e34c26' }
@@ -134,6 +135,48 @@ export function Empty({ title, children }) {
       <IssueOpenedIcon size={20} className="muted" />
       <h2>{title}</h2>
       {children}
+    </div>
+  )
+}
+
+// Mirrors api/models.py and api/passwords.py; the server is the real check (and also checks the
+// email name and known breaches, which can't be done here).
+const SITE_WORDS = ['starpull', 'firstpr']
+const passwordRules = (username) => [
+  ['At least 12 characters', (v) => [...v].length >= 12],
+  ['An uppercase letter', (v) => /\p{Lu}/u.test(v)],
+  ['A lowercase letter', (v) => /\p{Ll}/u.test(v)],
+  ['A special character, any symbol like ! @ # $ % ^ & * ? ~ < >', (v) => /[^\p{L}\p{N}\s]/u.test(v)],
+  [`Doesn't contain your username or the site name`,
+    (v) => v.length > 0 && ![username, ...SITE_WORDS].some((w) => w && w.length >= 3 && v.toLowerCase().includes(w.toLowerCase()))],
+]
+
+export function NewPasswordField({ id, name, label, username }) {
+  const [value, setValue] = useState('')
+  const input = useRef(null)
+  const results = passwordRules(username).map(([text, test]) => [text, test(value)])
+  const unmet = results.filter(([, ok]) => !ok).map(([text]) => text.split(',')[0].toLowerCase())
+
+  // Native validity blocks submit and shows the browser's own message, so forms need no extra state.
+  useEffect(() => {
+    input.current.setCustomValidity(unmet.length ? `Password needs: ${unmet.join(', ')}.` : '')
+  }, [unmet.join()])
+
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <input ref={input} className="input" id={id} name={name} type="password" required maxLength={72}
+        autoComplete="new-password" aria-describedby={`${id}-rules`} value={value} onChange={(e) => setValue(e.target.value)} />
+      <ul className="pw-rules" id={`${id}-rules`}>
+        {results.map(([text, ok]) => (
+          <li key={text} className={ok ? 'met' : ''}>
+            {ok ? <CheckIcon size={14} /> : <DotFillIcon size={14} />}
+            {text}
+            <span className="sr-only">{ok ? ' (done)' : ' (missing)'}</span>
+          </li>
+        ))}
+        <li className="note"><ShieldCheckIcon size={14} />We also make sure it hasn't leaked in a known data breach.</li>
+      </ul>
     </div>
   )
 }

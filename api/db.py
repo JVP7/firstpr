@@ -19,6 +19,9 @@ pool = ConnectionPool(
     # prepare_threshold=None keeps this working through Supabase's transaction pooler.
     # sslmode=require refuses an unencrypted fallback; set DB_SSLMODE=disable for a local Postgres.
     kwargs={"prepare_threshold": None, "row_factory": dict_row, "sslmode": os.getenv("DB_SSLMODE", "require")},
+    # Test each connection before handing it out: Supabase drops idle ones, which otherwise
+    # surface as a 500 on the next request.
+    check=ConnectionPool.check_connection,
     open=False,
 )
 

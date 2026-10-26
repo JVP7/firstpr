@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { MarkGithubIcon } from '@primer/octicons-react'
 import { useAuth } from '../auth'
+import { NewPasswordField } from '../components'
 
 const OAUTH_ERRORS = {
   denied: 'GitHub sign-in was cancelled.',
@@ -84,12 +85,7 @@ export default function AuthPage({ mode }) {
                 <label htmlFor="email">Email</label>
                 <input className="input" id="email" name="email" type="email" required autoComplete="email" spellCheck={false} />
               </div>
-              <div className="field">
-                <label htmlFor="password">Password</label>
-                <input className="input" id="password" name="password" type="password" required minLength={8} maxLength={72}
-                  autoComplete="new-password" aria-describedby="pw-hint" />
-                <span className="hint" id="pw-hint">At least 8 characters.</span>
-              </div>
+              <NewPasswordField id="password" name="password" label="Password" username={pendingGithub} />
             </>
           ) : (
             <>
