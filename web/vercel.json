@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://RENDER_SERVICE.onrender.com/:path*"
+      "destination": "https://firstpr-api.onrender.com/:path*"
     },
     {
       "source": "/((?!assets/).*)",
