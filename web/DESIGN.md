@@ -63,5 +63,9 @@ and error (message + Retry) states.
 Content column max 880px. At 390px: 16px margins, nav collapses to wordmark plus three short
 links, the saved board becomes tabs. No horizontal scroll.
 
+## Logo
+Octicons git-pull-request glyph (MIT, GitHub Inc.) in dark-mode match green #3FB950 on an ink tile #16181D,
+512 viewBox, corner radius 112. Glyph-on-tile contrast 7.0:1. Source: web/public/logo.svg.
+
 ## Known gaps
-No custom illustration or logo yet; the wordmark is text.
+No custom illustration yet.
