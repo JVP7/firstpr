@@ -1,6 +1,7 @@
--- Example: user_id=1 (the user needs repos or declared skills).
+-- Example: user_id=1, languages=NULL (or '{Python,TypeScript}' to keep only those repo languages).
 -- Expected: Top 20 open, unassigned issues ranked by 0.8 * Jaccard(user packages, repo packages)
 -- + 0.2 if the repo's language matches one of the user's repos; only repos sharing a package qualify.
+-- Every issue in a repo scores the same, so at most 3 (the newest) are kept per repo.
 WITH user_pkgs AS (
     SELECT package_id FROM user_dependencies WHERE user_id = :user_id
     UNION
@@ -28,22 +29,33 @@ repo_scores AS (
     JOIN packages p ON p.package_id = rd.package_id
     JOIN repo_sizes rs ON rs.repo_id = rd.repo_id
     GROUP BY rd.repo_id, rs.repo_pkg_count
+),
+ranked AS (
+    SELECT i.issue_id,
+           r.full_name,
+           i.number,
+           i.title,
+           r.primary_language,
+           r.stars,
+           ROUND(sc.jaccard, 4) AS jaccard,
+           (ul.primary_language IS NOT NULL) AS language_match,
+           ROUND(0.8 * sc.jaccard + CASE WHEN ul.primary_language IS NOT NULL THEN 0.2 ELSE 0 END, 4) AS score,
+           sc.shared_packages,
+           i.created_at,
+           ROW_NUMBER() OVER (PARTITION BY r.repo_id ORDER BY i.created_at DESC) AS repo_rank
+    FROM repo_scores sc
+    JOIN repos r ON r.repo_id = sc.repo_id AND NOT r.is_archived
+    JOIN issues i ON i.repo_id = r.repo_id AND i.state = 'open' AND NOT i.is_assigned
+    LEFT JOIN user_langs ul ON ul.primary_language = r.primary_language
+    WHERE NOT EXISTS (
+        SELECT 1 FROM user_repos ur WHERE ur.user_id = :user_id AND ur.repo_id = r.repo_id
+    )
+      AND (CAST(:languages AS text[]) IS NULL OR r.primary_language = ANY (CAST(:languages AS text[])))
 )
-SELECT i.issue_id,
-       r.full_name,
-       i.number,
-       i.title,
-       r.primary_language,
-       ROUND(sc.jaccard, 4) AS jaccard,
-       (ul.primary_language IS NOT NULL) AS language_match,
-       ROUND(0.8 * sc.jaccard + CASE WHEN ul.primary_language IS NOT NULL THEN 0.2 ELSE 0 END, 4) AS score,
-       sc.shared_packages
-FROM repo_scores sc
-JOIN repos r ON r.repo_id = sc.repo_id AND NOT r.is_archived
-JOIN issues i ON i.repo_id = r.repo_id AND i.state = 'open' AND NOT i.is_assigned
-LEFT JOIN user_langs ul ON ul.primary_language = r.primary_language
-WHERE NOT EXISTS (
-    SELECT 1 FROM user_repos ur WHERE ur.user_id = :user_id AND ur.repo_id = r.repo_id
-)
-ORDER BY score DESC, i.created_at DESC
+SELECT issue_id, full_name, number, title, primary_language, stars, jaccard, language_match, score, shared_packages,
+       ARRAY(SELECT l.name FROM issue_labels il JOIN labels l ON l.label_id = il.label_id
+             WHERE il.issue_id = ranked.issue_id ORDER BY l.name) AS labels
+FROM ranked
+WHERE repo_rank <= 3
+ORDER BY score DESC, created_at DESC
 LIMIT 20;

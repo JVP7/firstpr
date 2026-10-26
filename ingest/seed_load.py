@@ -25,7 +25,8 @@ log = logging.getLogger("ingest")
 
 def connect():
     # prepare_threshold=None keeps this working through Supabase's transaction pooler.
-    return psycopg.connect(os.environ["DATABASE_URL"], prepare_threshold=None)
+    return psycopg.connect(os.environ["DATABASE_URL"], prepare_threshold=None,
+                           sslmode=os.getenv("DB_SSLMODE", "require"))
 
 
 def main():

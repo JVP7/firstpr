@@ -1,0 +1,28 @@
+# Render Blueprint for the API. Secrets marked sync: false are entered in the Render dashboard.
+services:
+  - type: web
+    name: firstpr-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT --no-server-header
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TRUSTED_PROXY_HOPS
+        value: "2"
+      - key: DATABASE_URL
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
