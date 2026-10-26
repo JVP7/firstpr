@@ -45,40 +45,38 @@ def security_event(event, request: Request, **fields):
 
 
 class RateLimiter:
-    """Sliding-window counter per key, stored in Postgres so limits survive deploys and are
-    shared across instances. Each call uses its own short connection, so a hit is recorded
-    even when the request that caused it fails and rolls back."""
+    """Sliding-window counter per subject (an IP, user or login name), stored in Postgres so
+    limits survive deploys and are shared across instances. Each call uses its own short
+    connection, so a hit is recorded even when the request that caused it fails and rolls back."""
 
     def __init__(self, name, limit, window_seconds):
         self.name, self.limit, self.window = name, limit, window_seconds
 
-    def _key(self, key):
-        return f"{self.name}:{key}"
-
-    def blocked(self, key):
+    def blocked(self, subject):
         with pool.connection() as conn:
             row = conn.execute(
-                "SELECT count(*) AS n FROM rate_limit_hits WHERE key = %s AND at > now() - make_interval(secs => %s)",
-                (self._key(key), self.window)).fetchone()
+                "SELECT count(*) AS n FROM rate_limit_hits "
+                "WHERE limiter = %s AND subject = %s AND at > now() - make_interval(secs => %s)",
+                (self.name, str(subject), self.window)).fetchone()
         return row["n"] >= self.limit
 
-    def hit(self, key):
+    def hit(self, subject):
         with pool.connection() as conn:
-            conn.execute("INSERT INTO rate_limit_hits (key) VALUES (%s)", (self._key(key),))
-            # Keep the table small: drop this key's hits that fell out of the window.
-            conn.execute("DELETE FROM rate_limit_hits WHERE key = %s AND at <= now() - make_interval(secs => %s)",
-                         (self._key(key), self.window))
+            conn.execute("INSERT INTO rate_limit_hits (limiter, subject) VALUES (%s, %s)", (self.name, str(subject)))
+            # Keep the table small: drop this subject's hits that fell out of the window.
+            conn.execute("DELETE FROM rate_limit_hits WHERE limiter = %s AND subject = %s "
+                         "AND at <= now() - make_interval(secs => %s)", (self.name, str(subject), self.window))
 
-    def reset(self, key):
+    def reset(self, subject):
         with pool.connection() as conn:
-            conn.execute("DELETE FROM rate_limit_hits WHERE key = %s", (self._key(key),))
+            conn.execute("DELETE FROM rate_limit_hits WHERE limiter = %s AND subject = %s", (self.name, str(subject)))
 
-    def check(self, key, request: Request):
-        """Count one request and raise 429 once the key is over its limit."""
-        if self.blocked(key):
+    def check(self, subject, request: Request):
+        """Count one request and raise 429 once the subject is over its limit."""
+        if self.blocked(subject):
             security_event("rate_limited", request, limit=self.name)
             raise HTTPException(429, "Too many attempts. Wait a few minutes and try again.")
-        self.hit(key)
+        self.hit(subject)
 
 
 login_failures = RateLimiter("login_fail", limit=5, window_seconds=15 * 60)  # per account: lockout
