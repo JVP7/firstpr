@@ -1,0 +1,42 @@
+# Local stack: Postgres with the schema applied on first start, plus the API.
+#   docker compose up --build          # http://localhost:8000/health
+#   docker compose run --rm api python -m ingest.seed_load --limit 10   # load a few repos (needs GITHUB_TOKEN)
+#   docker compose down -v             # stop and wipe the local database
+# Secrets come from .env when present; the database is always the local container, never Supabase.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: starpull
+    volumes:
+      - ./sql/schema:/docker-entrypoint-initdb.d:ro   # 001..004 run in order on an empty volume
+      - dbdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"   # 5433 so it doesn't clash with a Postgres already on the host
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d starpull"]
+      interval: 2s
+      retries: 30
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/starpull
+      DB_SSLMODE: disable
+      JWT_SECRET: ${JWT_SECRET:-local-docker-secret-not-for-production-000}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      APP_URL: http://localhost:5173
+      ALLOWED_ORIGINS: http://localhost:5173
+      ENABLE_DOCS: "1"
+    ports:
+      - "8000:8000"
+
+volumes:
+  dbdata:
