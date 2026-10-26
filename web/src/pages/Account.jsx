@@ -65,7 +65,7 @@ function EmailSection({ user, onChanged }) {
   )
 }
 
-function PasswordSection() {
+function PasswordSection({ user }) {
   const [state, run] = useAction()
   const onSubmit = (e) => {
     e.preventDefault()
@@ -84,7 +84,7 @@ function PasswordSection() {
           <label htmlFor="cur-pw">Current password</label>
           <input className="input" id="cur-pw" name="current_password" type="password" required autoComplete="current-password" />
         </div>
-        <NewPasswordField id="new-pw" name="new_password" label="New password" />
+        <NewPasswordField id="new-pw" name="new_password" label="New password" username={user.github_username} />
         <p className="hint">Changing it signs out every other device.</p>
         <Feedback state={state} />
         <button className="btn secondary" type="submit" disabled={state.status === 'busy'}>Change password</button>
@@ -205,7 +205,7 @@ export default function Account() {
       </div>
       <div className="settings">
         <EmailSection user={user} onChanged={refresh} />
-        <PasswordSection />
+        <PasswordSection user={user} />
         <ReposSection user={user} onChanged={refresh} />
         <SessionsSection onSignedOut={() => leave('/login')} />
         <DangerZone user={user} onDeleted={() => leave('/login?deleted=1')} />

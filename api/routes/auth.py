@@ -13,6 +13,7 @@ from api.auth import (check_password, clear_pending_github, current_user, end_se
 from api.db import get_conn, pool, run_file
 from api.github_import import import_user_repos
 from api.models import LoginIn, SignupIn
+from api.passwords import new_password_problem
 from api.security import auth_requests, client_ip, login_failures, security_event, signups
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -92,6 +93,9 @@ def signup(body: SignupIn, request: Request, response: Response):
     ip = client_ip(request)
     auth_requests.check(ip, request)
     signups.check(ip, request)
+    problem = new_password_problem(body.password, github_username, body.email)
+    if problem:
+        raise HTTPException(422, problem)
     try:
         with pool.connection() as conn:
             [user] = run_file(conn, "basic/user_insert", github_username=github_username,

@@ -145,15 +145,15 @@ def test_ending_all_sessions_rejects_older_tokens(db):
 
 
 @pytest.mark.parametrize("password, ok", [
-    ("Hunter2!go", True),
-    ("Ab~cdefg", True),          # any symbol counts
-    ("Ab<cdefg", True),
-    ("Ñandú#pass", True),        # non-ASCII letters count as upper/lower
-    ("hunter2!go", False),       # no uppercase
-    ("HUNTER2!GO", False),       # no lowercase
-    ("Hunter2go", False),        # no special character
-    ("Hunter 2go", False),       # a space is not a special character
-    ("Ab!cdef", False),          # too short
+    ("Hunter2!going", True),
+    ("Abcdefghij~k", True),         # any symbol counts
+    ("Abcdefghij<k", True),
+    ("Ñandú#passwords", True),      # non-ASCII letters count as upper/lower
+    ("hunter2!going", False),       # no uppercase
+    ("HUNTER2!GOING", False),       # no lowercase
+    ("Hunter2going", False),        # no special character
+    ("Hunter 2going", False),       # a space is not a special character
+    ("Abcdefghi!j", False),         # 11 characters: too short
 ])
 def test_password_rules(password, ok):
     if ok:
@@ -161,3 +161,53 @@ def test_password_rules(password, ok):
     else:
         with pytest.raises(ValidationError):
             SignupIn(email="a@example.com", password=password)
+
+
+@pytest.mark.parametrize("password, problem", [
+    ("Octocat!Rules99", "your GitHub username"),
+    ("my.MAIL#2026xyz", "your email name"),
+    ("Starpull!rocks1", "the site name"),
+    ("FirstPR!forever", "the site name"),
+    ("Cobalt!Harbor42", None),
+])
+def test_password_context(password, problem):
+    from api.passwords import context_problem
+    result = context_problem(password, "octocat", "my.mail@example.com")
+    assert (problem in result) if problem else result is None
+
+
+class FakeRange:
+    def __init__(self, text=None, error=None):
+        self.text, self.error = text, error
+
+    def raise_for_status(self):
+        if self.error:
+            raise self.error
+
+
+def test_breach_check_matches_locally_and_fails_open(monkeypatch):
+    import hashlib
+    import requests
+    from api import passwords
+
+    pw = "Cobalt!Harbor42"
+    suffix = hashlib.sha1(pw.encode()).hexdigest().upper()[5:]
+    sent = []
+
+    def fake_get(url, **kwargs):
+        sent.append(url)
+        return FakeRange(text=f"0000000000000000000000000000000000A:3\r\n{suffix}:42")
+
+    monkeypatch.setattr(passwords.requests, "get", fake_get)
+    assert passwords.breach_count(pw) == 42
+    assert sent[0].endswith("/" + hashlib.sha1(pw.encode()).hexdigest().upper()[:5])  # only the prefix leaves
+
+    monkeypatch.setattr(passwords.requests, "get", lambda url, **kw: FakeRange(text=f"{suffix}:0"))
+    assert passwords.breach_count(pw) == 0  # padding row, not a real match
+
+    def down(url, **kwargs):
+        raise requests.ConnectionError("down")
+
+    monkeypatch.setattr(passwords.requests, "get", down)
+    assert passwords.breach_count(pw) is None
+    assert passwords.new_password_problem(pw, "octocat", "a@example.com") is None  # fails open

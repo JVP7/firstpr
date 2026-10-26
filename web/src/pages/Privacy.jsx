@@ -34,6 +34,7 @@ export default function Privacy() {
         <ul>
           <li>Every connection is encrypted, from your browser to our database.</li>
           <li>Your login is a cookie that scripts on the page can't read. It expires after a day and ends the moment you log out.</li>
+          <li>New passwords need at least 12 characters with upper and lowercase letters and a symbol, can't contain your username or email name, and are checked against passwords leaked in known data breaches. For that check only the first 5 characters of a scrambled (hashed) version leave our server, never the password.</li>
           <li>Five wrong passwords lock the account for 15 minutes. Changing your email, password or deleting the account asks for your password again.</li>
           <li>Other sites can't make changes to your account on your behalf, and the site blocks scripts from anywhere but itself.</li>
           <li>Our security log records sign-ins and account changes, never passwords or login cookies.</li>

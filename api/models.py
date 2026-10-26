@@ -21,7 +21,7 @@ def _password_rules(v):
 
 
 # For new passwords only (signup, change); login accepts whatever was set before these rules.
-Password = Annotated[str, Field(min_length=8, max_length=72), AfterValidator(_password_rules)]
+Password = Annotated[str, Field(min_length=12, max_length=72), AfterValidator(_password_rules)]
 
 
 class SignupIn(BaseModel):

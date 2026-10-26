@@ -246,3 +246,5 @@ button, input, select { font: inherit; color: inherit; }
 .pw-rules li svg { flex: none; opacity: 0.5; }
 .pw-rules li.met { color: var(--match); }
 .pw-rules li.met svg { opacity: 1; }
+.pw-rules li.note { color: var(--muted); }
+.pw-rules li.note svg { opacity: 1; }

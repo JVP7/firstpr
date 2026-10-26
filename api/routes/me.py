@@ -5,6 +5,7 @@ from api.auth import current_user, end_all_sessions, end_session, hash_password,
 from api.db import get_conn, run_file
 from api.github_import import import_user_repos
 from api.models import DeleteAccountIn, EmailIn, PasswordChangeIn, SkillIn
+from api.passwords import new_password_problem
 from api.security import resyncs, security_event
 
 router = APIRouter(tags=["me"])
@@ -38,7 +39,10 @@ def update_email(body: EmailIn, request: Request, user=Depends(current_user), co
 @router.patch("/me/password", status_code=204)
 def change_password(body: PasswordChangeIn, request: Request, response: Response,
                     user=Depends(current_user), conn=Depends(get_conn)):
-    require_password(request, user, body.current_password)
+    require_password(request, user, body.current_password)  # first, so the checks below can't be probed
+    problem = new_password_problem(body.new_password, user["github_username"], user["email"])
+    if problem:
+        raise HTTPException(422, problem)
     conn.execute("UPDATE users SET password_hash = %s, sessions_valid_after = now() WHERE user_id = %s",
                  (hash_password(body.new_password), user["user_id"]))
     conn.commit()

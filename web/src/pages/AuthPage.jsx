@@ -85,7 +85,7 @@ export default function AuthPage({ mode }) {
                 <label htmlFor="email">Email</label>
                 <input className="input" id="email" name="email" type="email" required autoComplete="email" spellCheck={false} />
               </div>
-              <NewPasswordField id="password" name="password" label="Password" />
+              <NewPasswordField id="password" name="password" label="Password" username={pendingGithub} />
             </>
           ) : (
             <>
