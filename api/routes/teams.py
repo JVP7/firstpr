@@ -65,7 +65,7 @@ def add_member(team_id: int, body: TeamMemberIn, user=Depends(current_user), con
     member = conn.execute("SELECT user_id FROM users WHERE lower(github_username) = lower(%s)",
                           (body.github_username,)).fetchone()
     if member is None:
-        raise HTTPException(404, "No FirstPR user with that GitHub username")
+        raise HTTPException(404, "No Starpull user with that GitHub username")
     rows = run_file(conn, "basic/team_member_add", team_id=team_id, user_id=member["user_id"], role=body.role)
     if not rows:
         raise HTTPException(409, "Already on the team")

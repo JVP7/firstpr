@@ -20,7 +20,7 @@ function Shell() {
       <a className="skip" href="#main">Skip to content</a>
       <header className="nav">
         <div className="nav-inner">
-          <Link to="/" className="wordmark"><GitPullRequestIcon size={18} />FirstPR</Link>
+          <Link to="/" className="wordmark"><GitPullRequestIcon size={18} />Starpull</Link>
           <nav className="nav-links" aria-label="Main">
             <NavLink to="/" end>Matches</NavLink>
             <NavLink to="/search">Search</NavLink>

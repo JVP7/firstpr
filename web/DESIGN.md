@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: firstpr-design
+name: starpull-design
 description: A calm, dense tool for picking a first open-source issue. Neutral near-white (light) or near-black (dark) ground, near-black or near-white ink, and one green accent reserved for "why this matches you". System UI type, monospace only for package names. A sparse meteor shower drifts across the page background as the single signature motion.
 colors:
   canvas: "#F7F8F7"      # dark: "#0E1013"
@@ -27,7 +27,7 @@ components:
 ---
 
 ## Overview
-FirstPR is an app screen, not a marketing page. Every screen serves one decision: which issue to
+Starpull is an app screen, not a marketing page. Every screen serves one decision: which issue to
 pick up. Dense enough to scan 20 cards, quiet enough to read them.
 
 - One accent, green, and it only ever means "this matches your stack".
@@ -63,5 +63,9 @@ and error (message + Retry) states.
 Content column max 880px. At 390px: 16px margins, nav collapses to wordmark plus three short
 links, the saved board becomes tabs. No horizontal scroll.
 
+## Logo
+Octicons git-pull-request glyph (MIT, GitHub Inc.) in dark-mode match green #3FB950 on an ink tile #16181D,
+512 viewBox, corner radius 112. Glyph-on-tile contrast 7.0:1. Source: web/public/logo.svg.
+
 ## Known gaps
-No custom illustration or logo yet; the wordmark is text.
+No custom illustration yet.
