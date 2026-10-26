@@ -211,3 +211,14 @@ def test_breach_check_matches_locally_and_fails_open(monkeypatch):
     monkeypatch.setattr(passwords.requests, "get", down)
     assert passwords.breach_count(pw) is None
     assert passwords.new_password_problem(pw, "octocat", "a@example.com") is None  # fails open
+
+
+def test_validation_errors_never_echo_passwords():
+    from api.main import app
+    client = TestClient(app)  # no lifespan: validation fails before any database access
+    secret = "Abcdefghi!j"
+    for path, body in (("/auth/signup", {"email": "a@example.com", "password": secret}),
+                       ("/auth/login", {"login": "x", "password": secret * 30})):
+        resp = client.post(path, json=body)
+        assert resp.status_code == 422
+        assert secret not in resp.text and "input" not in resp.json()["detail"][0]
