@@ -18,4 +18,4 @@ This starts Postgres 17 (schema applied automatically from `sql/schema/`) and th
 docker compose run --rm api python -m ingest.seed_load --limit 10
 ```
 
-For the website, run `npm install && npm run dev` in `web/` and open http://localhost:5173. GitHub sign-in also needs `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in `.env`; without them, use the password login after creating a user, or explore Search. `docker compose down -v` stops everything and wipes the local database.
+For the website, run `npm install && npm run dev` in `web/` and open http://localhost:5173. Signing up goes through GitHub, so the website also needs `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in `.env` (an OAuth app with the callback `http://localhost:5173/api/auth/github/callback`). Without them you can still try every endpoint at http://localhost:8000/docs. `docker compose down -v` stops everything and wipes the local database.
