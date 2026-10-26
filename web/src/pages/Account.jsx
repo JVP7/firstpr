@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MarkGithubIcon, SyncIcon } from '@primer/octicons-react'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { NewPasswordField } from '../components'
 
 // One small form state machine per section: idle -> busy -> done | error.
 function useAction() {
@@ -83,12 +84,8 @@ function PasswordSection() {
           <label htmlFor="cur-pw">Current password</label>
           <input className="input" id="cur-pw" name="current_password" type="password" required autoComplete="current-password" />
         </div>
-        <div className="field">
-          <label htmlFor="new-pw">New password</label>
-          <input className="input" id="new-pw" name="new_password" type="password" required minLength={8} maxLength={72}
-            autoComplete="new-password" aria-describedby="new-pw-hint" />
-          <span className="hint" id="new-pw-hint">At least 8 characters. Changing it signs out every other device.</span>
-        </div>
+        <NewPasswordField id="new-pw" name="new_password" label="New password" />
+        <p className="hint">Changing it signs out every other device.</p>
         <Feedback state={state} />
         <button className="btn secondary" type="submit" disabled={state.status === 'busy'}>Change password</button>
       </form>

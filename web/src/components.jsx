@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { IssueOpenedIcon, StarIcon } from '@primer/octicons-react'
+import { CheckIcon, DotFillIcon, IssueOpenedIcon, StarIcon } from '@primer/octicons-react'
 
 // GitHub linguist colors for the languages in the seed list.
 const LANG_COLORS = { Python: '#3572A5', JavaScript: '#f1e05a', TypeScript: '#3178c6', 'Jupyter Notebook': '#DA5B0B', HTML: '#e34c26' }
@@ -134,6 +135,43 @@ export function Empty({ title, children }) {
       <IssueOpenedIcon size={20} className="muted" />
       <h2>{title}</h2>
       {children}
+    </div>
+  )
+}
+
+// Mirrors _password_rules in api/models.py; the server is the real check.
+const PASSWORD_RULES = [
+  ['At least 8 characters', (v) => [...v].length >= 8],
+  ['An uppercase letter', (v) => /\p{Lu}/u.test(v)],
+  ['A lowercase letter', (v) => /\p{Ll}/u.test(v)],
+  ['A special character, any symbol like ! @ # $ % ^ & * ? ~ < >', (v) => /[^\p{L}\p{N}\s]/u.test(v)],
+]
+
+export function NewPasswordField({ id, name, label }) {
+  const [value, setValue] = useState('')
+  const input = useRef(null)
+  const results = PASSWORD_RULES.map(([text, test]) => [text, test(value)])
+  const unmet = results.filter(([, ok]) => !ok).map(([text]) => text.split(',')[0].toLowerCase())
+
+  // Native validity blocks submit and shows the browser's own message, so forms need no extra state.
+  useEffect(() => {
+    input.current.setCustomValidity(unmet.length ? `Password needs: ${unmet.join(', ')}.` : '')
+  }, [unmet.join()])
+
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <input ref={input} className="input" id={id} name={name} type="password" required maxLength={72}
+        autoComplete="new-password" aria-describedby={`${id}-rules`} value={value} onChange={(e) => setValue(e.target.value)} />
+      <ul className="pw-rules" id={`${id}-rules`}>
+        {results.map(([text, ok]) => (
+          <li key={text} className={ok ? 'met' : ''}>
+            {ok ? <CheckIcon size={14} /> : <DotFillIcon size={14} />}
+            {text}
+            <span className="sr-only">{ok ? ' (done)' : ' (missing)'}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

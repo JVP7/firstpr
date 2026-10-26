@@ -25,7 +25,8 @@ export async function api(path, { method = 'GET', body } = {}) {
   const data = await res.json().catch(() => null)
   if (!res.ok) {
     const detail = data?.detail
-    const message = typeof detail === 'string' ? detail : detail?.[0]?.msg ?? `Request failed (${res.status})`
+    // Pydantic prefixes custom validator messages with "Value error, "; users don't need it.
+    const message = typeof detail === 'string' ? detail : detail?.[0]?.msg?.replace(/^Value error, /, '') ?? `Request failed (${res.status})`
     throw new ApiError(res.status, message)
   }
   return data

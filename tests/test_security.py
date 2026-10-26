@@ -111,9 +111,9 @@ def test_csrf_rejects_foreign_origin_and_sets_headers():
 
 
 def test_password_limit_counts_bytes():
-    SignupIn(email="a@example.com", password="p" * 72)
+    SignupIn(email="a@example.com", password="P!" + "p" * 70)
     with pytest.raises(ValidationError):
-        SignupIn(email="a@example.com", password="é" * 40)  # 80 bytes
+        SignupIn(email="a@example.com", password="É!" + "é" * 40)  # 83 bytes, passes the other rules
 
 
 def test_load_sql_converts_placeholders_but_not_casts():
@@ -142,3 +142,22 @@ def test_ending_all_sessions_rejects_older_tokens(db):
     finally:
         with pool.connection() as conn:
             conn.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+
+
+@pytest.mark.parametrize("password, ok", [
+    ("Hunter2!go", True),
+    ("Ab~cdefg", True),          # any symbol counts
+    ("Ab<cdefg", True),
+    ("Ñandú#pass", True),        # non-ASCII letters count as upper/lower
+    ("hunter2!go", False),       # no uppercase
+    ("HUNTER2!GO", False),       # no lowercase
+    ("Hunter2go", False),        # no special character
+    ("Hunter 2go", False),       # a space is not a special character
+    ("Ab!cdef", False),          # too short
+])
+def test_password_rules(password, ok):
+    if ok:
+        SignupIn(email="a@example.com", password=password)
+    else:
+        with pytest.raises(ValidationError):
+            SignupIn(email="a@example.com", password=password)

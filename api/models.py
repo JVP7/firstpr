@@ -5,14 +5,23 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, EmailStr, Field
 
 
-def _fits_bcrypt(v):
+def _password_rules(v):
     # bcrypt silently ignores bytes past 72, and non-ASCII characters take several bytes.
     if len(v.encode()) > 72:
         raise ValueError("Password is too long (72 bytes max)")
+    missing = [rule for rule, ok in (
+        ("an uppercase letter", any(c.isupper() for c in v)),
+        ("a lowercase letter", any(c.islower() for c in v)),
+        # Any symbol counts: anything that isn't a letter, digit or whitespace.
+        ("a special character", any(not c.isalnum() and not c.isspace() for c in v)),
+    ) if not ok]
+    if missing:
+        raise ValueError("Password needs " + ", ".join(missing))
     return v
 
 
-Password = Annotated[str, Field(min_length=8, max_length=72), AfterValidator(_fits_bcrypt)]
+# For new passwords only (signup, change); login accepts whatever was set before these rules.
+Password = Annotated[str, Field(min_length=8, max_length=72), AfterValidator(_password_rules)]
 
 
 class SignupIn(BaseModel):
