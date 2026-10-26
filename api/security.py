@@ -2,12 +2,11 @@
 
 import logging
 import os
-import time
-from collections import defaultdict, deque
-from threading import Lock
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
+
+from api.db import pool
 
 log = logging.getLogger("firstpr.security")
 
@@ -17,6 +16,8 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
+    # The old XSS auditor is removed from browsers and could be abused; OWASP says turn it off.
+    "X-XSS-Protection": "0",
     "Referrer-Policy": "no-referrer",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     # The API only returns JSON, so nothing may load or frame it.
@@ -44,48 +45,46 @@ def security_event(event, request: Request, **fields):
 
 
 class RateLimiter:
-    """Sliding-window counter per key.
+    """Sliding-window counter per key, stored in Postgres so limits survive deploys and are
+    shared across instances. Each call uses its own short connection, so a hit is recorded
+    even when the request that caused it fails and rolls back."""
 
-    shortcut: in-memory, so limits are per process and reset on deploy; move to Postgres or Redis
-    if the API runs more than one instance.
-    """
+    def __init__(self, name, limit, window_seconds):
+        self.name, self.limit, self.window = name, limit, window_seconds
 
-    def __init__(self, limit, window_seconds):
-        self.limit, self.window = limit, window_seconds
-        self.hits = defaultdict(deque)
-        self.lock = Lock()
-
-    def _recent(self, key, now):
-        hits = self.hits[key]
-        while hits and hits[0] <= now - self.window:
-            hits.popleft()
-        return hits
+    def _key(self, key):
+        return f"{self.name}:{key}"
 
     def blocked(self, key):
-        with self.lock:
-            return len(self._recent(key, time.monotonic())) >= self.limit
+        with pool.connection() as conn:
+            row = conn.execute(
+                "SELECT count(*) AS n FROM rate_limit_hits WHERE key = %s AND at > now() - make_interval(secs => %s)",
+                (self._key(key), self.window)).fetchone()
+        return row["n"] >= self.limit
 
     def hit(self, key):
-        with self.lock:
-            now = time.monotonic()
-            self._recent(key, now).append(now)
+        with pool.connection() as conn:
+            conn.execute("INSERT INTO rate_limit_hits (key) VALUES (%s)", (self._key(key),))
+            # Keep the table small: drop this key's hits that fell out of the window.
+            conn.execute("DELETE FROM rate_limit_hits WHERE key = %s AND at <= now() - make_interval(secs => %s)",
+                         (self._key(key), self.window))
 
     def reset(self, key):
-        with self.lock:
-            self.hits.pop(key, None)
+        with pool.connection() as conn:
+            conn.execute("DELETE FROM rate_limit_hits WHERE key = %s", (self._key(key),))
 
-    def check(self, key, request: Request, event):
+    def check(self, key, request: Request):
         """Count one request and raise 429 once the key is over its limit."""
         if self.blocked(key):
-            security_event("rate_limited", request, limit=event)
+            security_event("rate_limited", request, limit=self.name)
             raise HTTPException(429, "Too many attempts. Wait a few minutes and try again.")
         self.hit(key)
 
 
-login_failures = RateLimiter(limit=5, window_seconds=15 * 60)    # per account: lockout
-auth_requests = RateLimiter(limit=30, window_seconds=15 * 60)    # per IP: login + signup
-signups = RateLimiter(limit=5, window_seconds=60 * 60)           # per IP: each signup calls GitHub ~40 times
-resyncs = RateLimiter(limit=3, window_seconds=60 * 60)           # per user
+login_failures = RateLimiter("login_fail", limit=5, window_seconds=15 * 60)  # per account: lockout
+auth_requests = RateLimiter("auth", limit=30, window_seconds=15 * 60)        # per IP: login + signup
+signups = RateLimiter("signup", limit=5, window_seconds=60 * 60)             # per IP: each signup calls GitHub ~40 times
+resyncs = RateLimiter("resync", limit=3, window_seconds=60 * 60)             # per user
 
 
 async def security_middleware(request: Request, call_next):

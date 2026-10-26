@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class SignupIn(BaseModel):
-    github_username: str = Field(min_length=1, max_length=39, pattern=r"^[A-Za-z0-9-]+$")
+    # The GitHub username is not here: it comes from the OAuth-verified cookie.
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
 

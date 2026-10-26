@@ -1,7 +1,7 @@
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from api.auth import clear_session, current_user, require_password
+from api.auth import current_user, end_session, require_password
 from api.db import get_conn, run_file
 from api.github_import import import_user_repos
 from api.models import EmailIn, PasswordConfirmIn, SkillIn
@@ -26,7 +26,7 @@ def me(user=Depends(current_user), conn=Depends(get_conn)):
 
 @router.patch("/me")
 def update_email(body: EmailIn, request: Request, user=Depends(current_user), conn=Depends(get_conn)):
-    require_password(conn, user, body.current_password)
+    require_password(request, user, body.current_password)
     security_event("email_changed", request, user_id=user["user_id"])
     try:
         [row] = run_file(conn, "basic/user_update_email", user_id=user["user_id"], email=body.email)
@@ -38,16 +38,16 @@ def update_email(body: EmailIn, request: Request, user=Depends(current_user), co
 @router.delete("/me", status_code=204)
 def delete_me(body: PasswordConfirmIn, request: Request, response: Response,
               user=Depends(current_user), conn=Depends(get_conn)):
-    require_password(conn, user, body.current_password)
+    require_password(request, user, body.current_password)
     run_file(conn, "basic/user_delete", user_id=user["user_id"])
     security_event("account_deleted", request, user_id=user["user_id"])
-    clear_session(response)
+    end_session(request, response)
 
 
 @router.post("/me/sync")
-def resync_repos(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
-    resyncs.check(user["user_id"], request, "resync")
-    return {"imported_repos": import_user_repos(conn, user["user_id"], user["github_username"])}
+def resync_repos(request: Request, user=Depends(current_user)):
+    resyncs.check(user["user_id"], request)
+    return {"imported_repos": import_user_repos(user["user_id"], user["github_username"])}
 
 
 @router.get("/packages")

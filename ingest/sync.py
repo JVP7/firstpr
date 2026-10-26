@@ -24,31 +24,40 @@ HISTORY_DAYS = 90
 
 def sync_repo(gh, conn, full_name, issues=True):
     """Upsert one repo and return its repo_id, or None if GitHub can't find it."""
+    data = fetch_repo(gh, full_name, issues)
+    return write_repo(conn, data) if data else None
+
+
+def fetch_repo(gh, full_name, issues=True):
+    """Everything GitHub has for one repo, without touching the database. None if not found."""
     resp = gh.get(f"/repos/{full_name}")
     if resp is None:
         log.warning("%s: not found, skipping", full_name)
         return None
     repo = resp.json()
-    repo_id = repo["id"]
     full_name = repo["full_name"]  # follows renames
-
-    deps = _fetch_dependencies(gh, full_name)
+    data = {"repo": repo, "deps": _fetch_dependencies(gh, full_name), "issues": issues}
     if issues:
-        labels = list(gh.paginate(f"/repos/{full_name}/labels"))
-        open_issues = _fetch_open_issues(gh, full_name, labels)
-        comments = _fetch_comments(gh, full_name)
-        pulls = _fetch_recent_pulls(gh, full_name)
+        data["labels"] = list(gh.paginate(f"/repos/{full_name}/labels"))
+        data["open_issues"] = _fetch_open_issues(gh, full_name, data["labels"])
+        data["comments"] = _fetch_comments(gh, full_name)
+        data["pulls"] = _fetch_recent_pulls(gh, full_name)
+    return data
 
+
+def write_repo(conn, data):
+    """Upsert what fetch_repo returned in one transaction; returns the repo_id."""
+    repo_id = data["repo"]["id"]
     with conn.transaction(), conn.pipeline():
-        _upsert_repo(conn, repo)
-        _replace_dependencies(conn, repo_id, deps)
-        if issues:
-            _upsert_labels(conn, repo_id, labels)
-            _upsert_issues(conn, repo_id, open_issues)
+        _upsert_repo(conn, data["repo"])
+        _replace_dependencies(conn, repo_id, data["deps"])
+        if data["issues"]:
+            _upsert_labels(conn, repo_id, data["labels"])
+            _upsert_issues(conn, repo_id, data["open_issues"])
             issue_ids = dict(conn.execute(
                 "SELECT number, issue_id FROM issues WHERE repo_id = %s", (repo_id,)).fetchall())
-            _upsert_comments(conn, comments, issue_ids)
-            _upsert_pulls(conn, repo_id, pulls)
+            _upsert_comments(conn, data["comments"], issue_ids)
+            _upsert_pulls(conn, repo_id, data["pulls"])
         conn.execute("UPDATE repos SET last_synced_at = now() WHERE repo_id = %s", (repo_id,))
     return repo_id
 
@@ -124,20 +133,24 @@ def _upsert_repo(conn, repo):
 
 
 def _replace_dependencies(conn, repo_id, deps):
+    # Two set-based statements instead of two round trips per package.
+    names, ecosystems = [n for n, _ in deps], [e for _, e in deps]
     conn.execute("DELETE FROM repo_dependencies WHERE repo_id = %s", (repo_id,))
-    for name, ecosystem in deps:
-        package_id = conn.execute(
-            """
-            INSERT INTO packages (name, ecosystem) VALUES (%s, %s)
-            ON CONFLICT (name, ecosystem) DO UPDATE SET name = EXCLUDED.name
-            RETURNING package_id
-            """,
-            (name, ecosystem),
-        ).fetchone()[0]
-        conn.execute(
-            "INSERT INTO repo_dependencies (repo_id, package_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-            (repo_id, package_id),
-        )
+    conn.execute(
+        "INSERT INTO packages (name, ecosystem) SELECT * FROM unnest(%s::text[], %s::text[]) "
+        "ON CONFLICT (name, ecosystem) DO NOTHING",
+        (names, ecosystems),
+    )
+    conn.execute(
+        """
+        INSERT INTO repo_dependencies (repo_id, package_id)
+        SELECT %s, p.package_id
+        FROM unnest(%s::text[], %s::text[]) AS d(name, ecosystem)
+        JOIN packages p USING (name, ecosystem)
+        ON CONFLICT DO NOTHING
+        """,
+        (repo_id, names, ecosystems),
+    )
 
 
 def _upsert_label(conn, repo_id, label):

@@ -15,7 +15,7 @@ PLACEHOLDER = re.compile(r"(?<!:):([A-Za-z_]\w*)")
 pool = ConnectionPool(
     os.environ["DATABASE_URL"],
     min_size=1,
-    max_size=int(os.getenv("DB_POOL_SIZE", "5")),
+    max_size=int(os.getenv("DB_POOL_SIZE", "10")),
     # prepare_threshold=None keeps this working through Supabase's transaction pooler.
     # sslmode=require refuses an unencrypted fallback; set DB_SSLMODE=disable for a local Postgres.
     kwargs={"prepare_threshold": None, "row_factory": dict_row, "sslmode": os.getenv("DB_SSLMODE", "require")},

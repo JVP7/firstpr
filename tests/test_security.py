@@ -1,5 +1,9 @@
 import os
+import uuid
 
+from dotenv import load_dotenv
+
+load_dotenv()
 os.environ.setdefault("JWT_SECRET", "x" * 40)
 os.environ.setdefault("DATABASE_URL", "postgresql://unused")
 
@@ -8,13 +12,36 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
-from api import security  # noqa: E402
-from api.db import load_sql  # noqa: E402
+from fastapi import HTTPException, Response  # noqa: E402
+
+from api import auth, security  # noqa: E402
+from api.db import load_sql, pool  # noqa: E402
 from api.models import SignupIn  # noqa: E402
 
+needs_db = pytest.mark.skipif(os.environ["DATABASE_URL"] == "postgresql://unused", reason="no DATABASE_URL")
 
-def test_rate_limiter_blocks_after_limit_and_resets():
-    limiter = security.RateLimiter(limit=2, window_seconds=60)
+
+@pytest.fixture(scope="module")
+def db():
+    pool.open()
+    yield
+    pool.close()
+
+
+class CookieRequest:
+    """Just enough of a Request for the auth helpers."""
+    def __init__(self, cookies):
+        self.cookies, self.headers, self.client = cookies, {}, type("C", (), {"host": "test"})()
+
+
+def cookie_from(response, name):
+    header = next(v for k, v in response.raw_headers if k == b"set-cookie" and v.startswith(name.encode()))
+    return header.decode().split(";")[0].split("=", 1)[1]
+
+
+@needs_db
+def test_rate_limiter_blocks_after_limit_and_resets(db):
+    limiter = security.RateLimiter(f"test-{uuid.uuid4()}", limit=2, window_seconds=60)
     limiter.hit("a")
     assert not limiter.blocked("a")
     limiter.hit("a")
@@ -22,6 +49,39 @@ def test_rate_limiter_blocks_after_limit_and_resets():
     assert not limiter.blocked("b")
     limiter.reset("a")
     assert not limiter.blocked("a")
+
+
+@needs_db
+def test_logout_revokes_the_token(db):
+    name = f"zz-test-{uuid.uuid4().hex[:8]}"
+    with pool.connection() as conn:
+        user_id = conn.execute("INSERT INTO users (github_username, email, password_hash) VALUES (%s, %s, 'x') "
+                               "RETURNING user_id", (name, f"{name}@example.com")).fetchone()["user_id"]
+    try:
+        _check_revocation(user_id)
+    finally:
+        with pool.connection() as conn:
+            conn.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+
+
+def _check_revocation(user_id):
+    login = Response()
+    auth.set_session(login, user_id)
+    token = cookie_from(login, auth.COOKIE)
+    assert auth.current_user(CookieRequest({auth.COOKIE: token}))["user_id"] == user_id
+    auth.end_session(CookieRequest({auth.COOKIE: token}), Response())
+    with pytest.raises(HTTPException) as e:
+        auth.current_user(CookieRequest({auth.COOKIE: token}))
+    assert e.value.status_code == 401
+
+
+def test_signup_cookie_is_not_a_session():
+    pending = Response()
+    auth.set_pending_github(pending, "octocat", 1)
+    token = cookie_from(pending, auth.PENDING_COOKIE)
+    assert auth.pending_github(CookieRequest({auth.PENDING_COOKIE: token})) == "octocat"
+    with pytest.raises(HTTPException):
+        auth.current_user(CookieRequest({auth.COOKIE: token}))
 
 
 class FakeRequest:
@@ -51,9 +111,9 @@ def test_csrf_rejects_foreign_origin_and_sets_headers():
 
 
 def test_password_limit_counts_bytes():
-    SignupIn(github_username="a", email="a@example.com", password="p" * 72)
+    SignupIn(email="a@example.com", password="p" * 72)
     with pytest.raises(ValidationError):
-        SignupIn(github_username="a", email="a@example.com", password="é" * 40)  # 80 bytes
+        SignupIn(email="a@example.com", password="é" * 40)  # 80 bytes
 
 
 def test_load_sql_converts_placeholders_but_not_casts():
