@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { IssueOpenedIcon, StarIcon } from '@primer/octicons-react'
 
 // GitHub linguist colors for the languages in the seed list.
-const LANG_COLORS = { Python: '#3572A5', JavaScript: '#f1e05a', TypeScript: '#3178c6', 'Jupyter Notebook': '#DA5B0B' }
+const LANG_COLORS = { Python: '#3572A5', JavaScript: '#f1e05a', TypeScript: '#3178c6', 'Jupyter Notebook': '#DA5B0B', HTML: '#e34c26' }
 const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 
@@ -14,10 +14,50 @@ export function timeAgo(iso) {
   return relative.format(Math.round(days / 365), 'year')
 }
 
+export const LangDot = ({ language }) => (
+  <span className="lang-dot" style={{ background: LANG_COLORS[language] ?? 'var(--muted)' }} aria-hidden="true" />
+)
+
+// Selected languages live in the URL as repeated ?lang= params; none selected means all.
+export function useLanguageParam() {
+  const [params, setParams] = useSearchParams()
+  const selected = params.getAll('lang')
+  const toggle = (language) => {
+    const next = new URLSearchParams(params)
+    next.delete('lang')
+    const set = selected.includes(language) ? selected.filter((l) => l !== language) : [...selected, language]
+    set.forEach((l) => next.append('lang', l))
+    setParams(next, { replace: true })
+  }
+  const clear = () => {
+    const next = new URLSearchParams(params)
+    next.delete('lang')
+    setParams(next, { replace: true })
+  }
+  return { selected, toggle, clear }
+}
+
+export function LanguageFilter({ options, selected, onToggle, onClear, label = 'Languages' }) {
+  return (
+    <fieldset className="lang-filter">
+      <legend>{label}</legend>
+      <button type="button" className="lang-option" aria-pressed={selected.length === 0} onClick={onClear}>All</button>
+      {options.map(({ language, count }) => (
+        <button key={language} type="button" className="lang-option" aria-pressed={selected.includes(language)}
+          onClick={() => onToggle(language)}>
+          <LangDot language={language} />
+          {language}
+          {count != null && <span className="count">{compact.format(count)}</span>}
+        </button>
+      ))}
+    </fieldset>
+  )
+}
+
 export function RepoLine({ repo, language, stars }) {
   return (
     <div className="repo-line">
-      {language && <span className="lang-dot" style={{ background: LANG_COLORS[language] ?? 'var(--muted)' }} title={language} />}
+      {language && <><LangDot language={language} /><span className="sr-only">{language}:</span></>}
       <span className="name">{repo}</span>
       {stars != null && (
         <span className="meta" aria-label={`${stars} stars`}>

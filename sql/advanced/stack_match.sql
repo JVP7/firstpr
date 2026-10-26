@@ -1,4 +1,4 @@
--- Example: user_id=1 (the user needs repos or declared skills).
+-- Example: user_id=1, languages=NULL (or '{Python,TypeScript}' to keep only those repo languages).
 -- Expected: Top 20 open, unassigned issues ranked by 0.8 * Jaccard(user packages, repo packages)
 -- + 0.2 if the repo's language matches one of the user's repos; only repos sharing a package qualify.
 -- Every issue in a repo scores the same, so at most 3 (the newest) are kept per repo.
@@ -50,6 +50,7 @@ ranked AS (
     WHERE NOT EXISTS (
         SELECT 1 FROM user_repos ur WHERE ur.user_id = :user_id AND ur.repo_id = r.repo_id
     )
+      AND (CAST(:languages AS text[]) IS NULL OR r.primary_language = ANY (CAST(:languages AS text[])))
 )
 SELECT issue_id, full_name, number, title, primary_language, stars, jaccard, language_match, score, shared_packages,
        ARRAY(SELECT l.name FROM issue_labels il JOIN labels l ON l.label_id = il.label_id

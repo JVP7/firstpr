@@ -4,7 +4,7 @@ import { XIcon } from '@primer/octicons-react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { useLoad } from '../useLoad'
-import { Empty, ErrorState, IssueCard, Skeletons } from '../components'
+import { Empty, ErrorState, IssueCard, LanguageFilter, Skeletons, useLanguageParam } from '../components'
 
 function AddSkill({ onAdded }) {
   const [query, setQuery] = useState('')
@@ -75,8 +75,14 @@ function Stack({ me, onChange }) {
 
 export default function Matches() {
   const { user, refresh } = useAuth()
-  const matches = useLoad(() => api('/issues/matches'), [user])
+  const { selected, toggle, clear } = useLanguageParam()
+  const tracked = useLoad(() => api('/issues/languages'), [])
+  const query = selected.map((l) => `language=${encodeURIComponent(l)}`).join('&')
+  const matches = useLoad(() => api(`/issues/matches?${query}`), [user, query])
   const hasPackages = user.repos.some((r) => r.package_count > 0) || user.skills.length > 0
+  // Only languages the user has written in AND that tracked projects use; anything else could only come back empty.
+  const mine = new Set(user.repos.map((r) => r.primary_language))
+  const languageOptions = (tracked.data ?? []).filter((t) => mine.has(t.language)).map((t) => ({ language: t.language }))
 
   return (
     <>
@@ -85,6 +91,9 @@ export default function Matches() {
         <p>Open, unassigned issues in projects that use the same packages you do. At most three per project.</p>
       </div>
       <Stack me={user} onChange={refresh} />
+      {languageOptions.length > 1 && (
+        <LanguageFilter label="Your languages" options={languageOptions} selected={selected} onToggle={toggle} onClear={clear} />
+      )}
       {matches.loading ? (
         <Skeletons />
       ) : matches.error ? (
@@ -92,6 +101,11 @@ export default function Matches() {
       ) : !hasPackages ? (
         <Empty title="No packages to match yet">
           <p>We didn't find a requirements.txt, pyproject.toml or package.json in your public repos. Add a few packages you know above and matches show up here.</p>
+        </Empty>
+      ) : matches.data.length === 0 && selected.length > 0 ? (
+        <Empty title={`No matches in ${selected.join(' or ')}`}>
+          <p>None of the projects in {selected.length > 1 ? 'these languages' : 'this language'} use your packages yet.</p>
+          <button className="btn secondary" onClick={clear}>Show all languages</button>
         </Empty>
       ) : matches.data.length === 0 ? (
         <Empty title="No matching issues right now">

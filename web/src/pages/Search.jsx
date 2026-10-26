@@ -2,17 +2,17 @@ import { useSearchParams } from 'react-router-dom'
 import { SearchIcon } from '@primer/octicons-react'
 import { api } from '../api'
 import { useLoad } from '../useLoad'
-import { Empty, ErrorState, IssueCard, Skeletons } from '../components'
+import { Empty, ErrorState, IssueCard, LanguageFilter, Skeletons, useLanguageParam } from '../components'
 
 export default function Search() {
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
-  const language = params.get('language') ?? ''
   const beginner = params.get('beginner') === '1'
-  const results = useLoad(
-    () => api(`/issues/search?${new URLSearchParams({ q, language, beginner_only: beginner, limit: 50 })}`),
-    [q, language, beginner],
-  )
+  const { selected, toggle, clear } = useLanguageParam()
+  const tracked = useLoad(() => api('/issues/languages'), [])
+  const query = new URLSearchParams({ q, beginner_only: beginner, limit: 50 })
+  selected.forEach((l) => query.append('language', l))
+  const results = useLoad(() => api(`/issues/search?${query}`), [query.toString()])
 
   const update = (changes) => {
     const next = new URLSearchParams(params)
@@ -35,17 +35,12 @@ export default function Search() {
           <label htmlFor="q">Title or project</label>
           <input id="q" name="q" className="input" type="search" defaultValue={q} key={q} placeholder="e.g. docs, flask, typo…" spellCheck={false} />
         </div>
-        <div className="field">
-          <label htmlFor="language">Language</label>
-          <select id="language" className="select" value={language} onChange={(e) => update({ language: e.target.value })}>
-            <option value="">Any</option>
-            <option>Python</option>
-            <option>JavaScript</option>
-            <option>TypeScript</option>
-          </select>
-        </div>
         <button className="btn" type="submit"><SearchIcon size={16} />Search</button>
       </form>
+      {tracked.data && (
+        <LanguageFilter options={tracked.data.map((t) => ({ language: t.language, count: t.open_issues }))}
+          selected={selected} onToggle={toggle} onClear={clear} />
+      )}
       <div className="search-options">
         <label className="check">
           <input type="checkbox" checked={beginner} onChange={(e) => update({ beginner: e.target.checked ? '1' : '' })} />
@@ -59,7 +54,7 @@ export default function Search() {
         <ErrorState error={results.error} onRetry={results.reload} />
       ) : results.data.length === 0 ? (
         <Empty title="No issues match">
-          <p>Try a shorter word, another language, or turn off the beginner filter.</p>
+          <p>Try a shorter word, more languages, or turn off the beginner filter.</p>
         </Empty>
       ) : (
         <ul className="list">{results.data.map((i) => <IssueCard key={i.issue_id} issue={i} />)}</ul>
