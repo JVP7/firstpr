@@ -50,8 +50,7 @@ function EmailSection({ user, onChanged }) {
       <form onSubmit={onSubmit}>
         <div className="field">
           <label htmlFor="email">Email</label>
-          <input className="input" id="email" name="email" type="email" required autoComplete="email" spellCheck={false}
-            placeholder="new@example.com" />
+          <input className="input" id="email" name="email" type="email" required autoComplete="email" spellCheck={false} />
           <span className="hint">Currently {user.email}</span>
         </div>
         <div className="field">
