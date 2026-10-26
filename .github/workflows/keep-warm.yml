@@ -1,0 +1,18 @@
+# Render's free tier sleeps after 15 idle minutes and takes ~1 minute to wake.
+# Pinging every 10 minutes keeps the API awake. GitHub may delay scheduled runs at busy times.
+name: Keep API warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping health endpoint
+        run: curl --fail --silent --show-error --max-time 120 --retry 2 --retry-delay 10 https://firstpr-api.onrender.com/health
