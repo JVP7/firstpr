@@ -1,10 +1,11 @@
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from api.auth import current_user
+from api.auth import clear_session, current_user, require_password
 from api.db import get_conn, run_file
 from api.github_import import import_user_repos
-from api.models import EmailIn, SkillIn
+from api.models import EmailIn, PasswordConfirmIn, SkillIn
+from api.security import resyncs, security_event
 
 router = APIRouter(tags=["me"])
 
@@ -24,7 +25,9 @@ def me(user=Depends(current_user), conn=Depends(get_conn)):
 
 
 @router.patch("/me")
-def update_email(body: EmailIn, user=Depends(current_user), conn=Depends(get_conn)):
+def update_email(body: EmailIn, request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    require_password(conn, user, body.current_password)
+    security_event("email_changed", request, user_id=user["user_id"])
     try:
         [row] = run_file(conn, "basic/user_update_email", user_id=user["user_id"], email=body.email)
     except psycopg.errors.UniqueViolation:
@@ -33,20 +36,27 @@ def update_email(body: EmailIn, user=Depends(current_user), conn=Depends(get_con
 
 
 @router.delete("/me", status_code=204)
-def delete_me(user=Depends(current_user), conn=Depends(get_conn)):
+def delete_me(body: PasswordConfirmIn, request: Request, response: Response,
+              user=Depends(current_user), conn=Depends(get_conn)):
+    require_password(conn, user, body.current_password)
     run_file(conn, "basic/user_delete", user_id=user["user_id"])
+    security_event("account_deleted", request, user_id=user["user_id"])
+    clear_session(response)
 
 
 @router.post("/me/sync")
-def resync_repos(user=Depends(current_user), conn=Depends(get_conn)):
+def resync_repos(request: Request, user=Depends(current_user), conn=Depends(get_conn)):
+    resyncs.check(user["user_id"], request, "resync")
     return {"imported_repos": import_user_repos(conn, user["user_id"], user["github_username"])}
 
 
 @router.get("/packages")
-def search_packages(q: str, limit: int = 20, conn=Depends(get_conn)):
+def search_packages(q: str = Query(min_length=1, max_length=100), limit: int = Query(20, ge=1, le=50),
+                    conn=Depends(get_conn)):
+    pattern = q.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
     return conn.execute(
         "SELECT package_id, name, ecosystem FROM packages WHERE name ILIKE %s "
-        "ORDER BY length(name), name LIMIT %s", (q.replace("%", r"\%") + "%", min(limit, 50))).fetchall()
+        "ORDER BY length(name), name LIMIT %s", (pattern, limit)).fetchall()
 
 
 @router.post("/me/skills", status_code=201)

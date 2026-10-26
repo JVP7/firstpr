@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
 from api.auth import current_user
 from api.db import get_conn, run_file
@@ -17,14 +17,15 @@ def by_dependencies(user=Depends(current_user), conn=Depends(get_conn)):
 
 
 @router.get("/search")
-def search(q: str | None = None, language: str | None = None, beginner_only: bool = False,
+def search(q: str | None = Query(None, max_length=100), language: str | None = Query(None, max_length=40),
+           beginner_only: bool = False,
            limit: int = Query(50, ge=1, le=200), conn=Depends(get_conn)):
     return run_file(conn, "advanced/issue_search", q=q or None, language=language or None,
                     beginner_only=beginner_only, limit=limit)
 
 
 @router.get("/{issue_id}")
-def issue_detail(issue_id: int, conn=Depends(get_conn)):
+def issue_detail(issue_id: int = Path(ge=1, le=2**63 - 1), conn=Depends(get_conn)):
     issue = conn.execute(
         "SELECT i.issue_id, i.number, i.title, i.state, i.created_at, i.is_assigned, "
         "       r.repo_id, r.full_name, r.primary_language, r.stars, "

@@ -1,14 +1,18 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { api, getToken, setToken } from './api'
+import { api } from './api'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [ready, setReady] = useState(!getToken())
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (getToken()) api('/me').then(setUser, () => setToken(null)).finally(() => setReady(true))
+    // The session lives in an httpOnly cookie, so asking /me is the only way to know who is logged in.
+    api('/auth/session')
+      .then((s) => (s.user ? api('/me') : null))
+      .then(setUser, () => setUser(null))
+      .finally(() => setReady(true))
     const onLogout = () => setUser(null)
     window.addEventListener('firstpr:logout', onLogout)
     return () => window.removeEventListener('firstpr:logout', onLogout)
@@ -16,12 +20,11 @@ export function AuthProvider({ children }) {
 
   const signIn = async (path, body) => {
     const res = await api(path, { method: 'POST', body })
-    setToken(res.token)
     setUser(await api('/me'))
     return res
   }
-  const signOut = () => {
-    setToken(null)
+  const signOut = async () => {
+    await api('/auth/logout', { method: 'POST' }).catch(() => {})
     setUser(null)
   }
   const refresh = async () => setUser(await api('/me'))

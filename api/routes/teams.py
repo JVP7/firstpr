@@ -1,3 +1,4 @@
+import psycopg
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import current_user
@@ -31,8 +32,11 @@ def my_teams(user=Depends(current_user), conn=Depends(get_conn)):
 
 @router.post("", status_code=201)
 def create_team(body: TeamIn, user=Depends(current_user), conn=Depends(get_conn)):
-    [team] = run_file(conn, "basic/team_insert", name=body.name, created_by=user["user_id"],
-                      target_repo_id=body.target_repo_id)
+    try:
+        [team] = run_file(conn, "basic/team_insert", name=body.name, created_by=user["user_id"],
+                          target_repo_id=body.target_repo_id)
+    except psycopg.errors.ForeignKeyViolation:
+        raise HTTPException(404, "Unknown target repo")
     run_file(conn, "basic/team_member_add", team_id=team["team_id"], user_id=user["user_id"], role="owner")
     return team
 

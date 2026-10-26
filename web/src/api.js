@@ -1,9 +1,6 @@
-const BASE = import.meta.env.VITE_API_URL ?? '/api'
-const TOKEN_KEY = 'firstpr.token'
-
-// shortcut: token in localStorage is readable by any XSS on this origin; move to an httpOnly cookie before real users.
-export const getToken = () => localStorage.getItem(TOKEN_KEY)
-export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY))
+// Same-origin path: Vite proxies /api in dev and Vercel rewrites it in prod, so the session
+// cookie is first-party and the API needs no CORS.
+const BASE = '/api'
 
 export class ApiError extends Error {
   constructor(status, message) {
@@ -13,19 +10,17 @@ export class ApiError extends Error {
 }
 
 export async function api(path, { method = 'GET', body } = {}) {
-  const headers = { 'Content-Type': 'application/json' }
-  const token = getToken()
-  if (token) headers.Authorization = `Bearer ${token}`
   let res
   try {
-    res = await fetch(BASE + path, { method, headers, body: body && JSON.stringify(body) })
+    res = await fetch(BASE + path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body && JSON.stringify(body),
+    })
   } catch {
     throw new ApiError(0, "Can't reach the FirstPR server. Check your connection and try again.")
   }
-  if (res.status === 401 && token) {
-    setToken(null)
-    window.dispatchEvent(new Event('firstpr:logout'))
-  }
+  if (res.status === 401) window.dispatchEvent(new Event('firstpr:logout'))
   if (res.status === 204) return null
   const data = await res.json().catch(() => null)
   if (!res.ok) {
