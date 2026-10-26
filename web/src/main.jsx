@@ -9,7 +9,35 @@ import Matches from './pages/Matches'
 import Search from './pages/Search'
 import IssueDetail from './pages/IssueDetail'
 import Saved from './pages/Saved'
+import Account from './pages/Account'
+import Privacy from './pages/Privacy'
 import './styles.css'
+
+const REPO = 'https://github.com/JVP7/firstpr'
+
+function Footer() {
+  const { user } = useAuth()
+  return (
+    <footer className="footer">
+      <div className="footer-inner">
+        <nav aria-label="Footer" className="footer-links">
+          {user && (
+            <>
+              <Link to="/">Matches</Link>
+              <Link to="/search">Search</Link>
+              <Link to="/saved">Saved</Link>
+              <Link to="/account">Account settings</Link>
+            </>
+          )}
+          <Link to="/privacy">Privacy &amp; security</Link>
+          <a href={REPO} target="_blank" rel="noreferrer">Source code</a>
+          <a href={`${REPO}/issues/new`} target="_blank" rel="noreferrer">Report a problem</a>
+        </nav>
+        <p className="footer-note">Starpull · open issues in projects that use your packages · formerly FirstPR</p>
+      </div>
+    </footer>
+  )
+}
 
 function Shell() {
   const { user, ready, signOut } = useAuth()
@@ -27,12 +55,13 @@ function Shell() {
             <NavLink to="/saved">Saved</NavLink>
           </nav>
           <div className="nav-user">
-            <span className="who">@{user.github_username}</span>
+            <Link to="/account" className="who">@{user.github_username}</Link>
             <button className="btn quiet small" onClick={signOut}>Log out</button>
           </div>
         </div>
       </header>
       <main id="main" className="page"><Outlet /></main>
+      <Footer />
     </>
   )
 }
@@ -40,7 +69,24 @@ function Shell() {
 function PublicOnly({ children }) {
   const { user, ready } = useAuth()
   if (!ready) return null
-  return user ? <Navigate to="/" replace /> : children
+  return user ? <Navigate to="/" replace /> : <>{children}<Footer /></>
+}
+
+// Readable whether or not you're logged in, so people can check it before signing up.
+function OpenPage({ children }) {
+  const { ready } = useAuth()
+  if (!ready) return null
+  return (
+    <>
+      <header className="nav">
+        <div className="nav-inner">
+          <Link to="/" className="wordmark"><GitPullRequestIcon size={18} />Starpull</Link>
+        </div>
+      </header>
+      <main id="main" className="page">{children}</main>
+      <Footer />
+    </>
+  )
 }
 
 createRoot(document.getElementById('root')).render(
@@ -56,7 +102,9 @@ createRoot(document.getElementById('root')).render(
             <Route path="search" element={<Search />} />
             <Route path="issues/:issueId" element={<IssueDetail />} />
             <Route path="saved" element={<Saved />} />
+            <Route path="account" element={<Account />} />
           </Route>
+          <Route path="/privacy" element={<OpenPage><Privacy /></OpenPage>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

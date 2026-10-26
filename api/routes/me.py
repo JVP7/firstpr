@@ -1,10 +1,10 @@
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from api.auth import current_user, end_session, require_password
+from api.auth import current_user, end_all_sessions, end_session, hash_password, require_password, set_session
 from api.db import get_conn, run_file
 from api.github_import import import_user_repos
-from api.models import EmailIn, PasswordConfirmIn, SkillIn
+from api.models import DeleteAccountIn, EmailIn, PasswordChangeIn, SkillIn
 from api.security import resyncs, security_event
 
 router = APIRouter(tags=["me"])
@@ -27,17 +27,38 @@ def me(user=Depends(current_user), conn=Depends(get_conn)):
 @router.patch("/me")
 def update_email(body: EmailIn, request: Request, user=Depends(current_user), conn=Depends(get_conn)):
     require_password(request, user, body.current_password)
-    security_event("email_changed", request, user_id=user["user_id"])
     try:
         [row] = run_file(conn, "basic/user_update_email", user_id=user["user_id"], email=body.email)
     except psycopg.errors.UniqueViolation:
         raise HTTPException(409, "That email is already registered")
+    security_event("email_changed", request, user_id=user["user_id"])
     return row
 
 
+@router.patch("/me/password", status_code=204)
+def change_password(body: PasswordChangeIn, request: Request, response: Response,
+                    user=Depends(current_user), conn=Depends(get_conn)):
+    require_password(request, user, body.current_password)
+    conn.execute("UPDATE users SET password_hash = %s, sessions_valid_after = now() WHERE user_id = %s",
+                 (hash_password(body.new_password), user["user_id"]))
+    conn.commit()
+    security_event("password_changed", request, user_id=user["user_id"])
+    # Every other device is signed out by the reset above; keep this one signed in.
+    set_session(response, user["user_id"])
+
+
+@router.post("/me/sessions/end-all", status_code=204)
+def sign_out_everywhere(request: Request, response: Response, user=Depends(current_user)):
+    end_all_sessions(user["user_id"])
+    security_event("sessions_ended", request, user_id=user["user_id"])
+    end_session(request, response)
+
+
 @router.delete("/me", status_code=204)
-def delete_me(body: PasswordConfirmIn, request: Request, response: Response,
+def delete_me(body: DeleteAccountIn, request: Request, response: Response,
               user=Depends(current_user), conn=Depends(get_conn)):
+    if body.confirm_username.lower() != user["github_username"].lower():
+        raise HTTPException(422, "Type your GitHub username exactly to confirm")
     require_password(request, user, body.current_password)
     run_file(conn, "basic/user_delete", user_id=user["user_id"])
     security_event("account_deleted", request, user_id=user["user_id"])

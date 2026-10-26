@@ -54,6 +54,12 @@ def set_session(response: Response, user_id):
     _cookie(response, COOKIE, token, TOKEN_TTL)
 
 
+def end_all_sessions(user_id):
+    """Invalidate every session this user has, on every device."""
+    with pool.connection() as conn:
+        conn.execute("UPDATE users SET sessions_valid_after = now() WHERE user_id = %s", (user_id,))
+
+
 def end_session(request: Request, response: Response):
     """Revoke the current token server-side, then drop the cookie."""
     token = request.cookies.get(COOKIE)
@@ -80,10 +86,13 @@ def current_user(request: Request):
     except (jwt.PyJWTError, KeyError, ValueError):
         raise HTTPException(401, "Session expired. Log in again.")
     with pool.connection() as conn:
+        # iat is whole seconds, so compare at second precision; a token from the same second as
+        # a reset survives it, which is the only gap.
         user = conn.execute(
             "SELECT user_id, github_username, email, created_at FROM users WHERE user_id = %s "
+            "AND (sessions_valid_after IS NULL OR to_timestamp(%s) >= date_trunc('second', sessions_valid_after)) "
             "AND NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE jti = %s)",
-            (user_id, claims.get("jti"))).fetchone()
+            (user_id, claims.get("iat", 0), claims.get("jti"))).fetchone()
     if user is None:
         raise HTTPException(401, "Session ended. Log in again.")
     return user

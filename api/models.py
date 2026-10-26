@@ -1,22 +1,34 @@
 """Request bodies."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import AfterValidator, BaseModel, EmailStr, Field
+
+
+def _fits_bcrypt(v):
+    # bcrypt silently ignores bytes past 72, and non-ASCII characters take several bytes.
+    if len(v.encode()) > 72:
+        raise ValueError("Password is too long (72 bytes max)")
+    return v
+
+
+Password = Annotated[str, Field(min_length=8, max_length=72), AfterValidator(_fits_bcrypt)]
 
 
 class SignupIn(BaseModel):
     # The GitHub username is not here: it comes from the OAuth-verified cookie.
     email: EmailStr
-    password: str = Field(min_length=8, max_length=72)
+    password: Password
 
-    @field_validator("password")
-    @classmethod
-    def fits_bcrypt(cls, v):
-        # bcrypt silently ignores bytes past 72, and non-ASCII characters take several bytes.
-        if len(v.encode()) > 72:
-            raise ValueError("Password is too long (72 bytes max)")
-        return v
+
+class PasswordChangeIn(BaseModel):
+    current_password: str = Field(max_length=200)
+    new_password: Password
+
+
+class DeleteAccountIn(BaseModel):
+    current_password: str = Field(max_length=200)
+    confirm_username: str = Field(max_length=39)
 
 
 class LoginIn(BaseModel):
@@ -26,10 +38,6 @@ class LoginIn(BaseModel):
 
 class EmailIn(BaseModel):
     email: EmailStr
-    current_password: str = Field(max_length=200)
-
-
-class PasswordConfirmIn(BaseModel):
     current_password: str = Field(max_length=200)
 
 
