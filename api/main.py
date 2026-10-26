@@ -9,7 +9,9 @@ from dotenv import load_dotenv
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 
 from api.db import pool  # noqa: E402
 from api.routes import auth, issues, me, saved, teams  # noqa: E402
@@ -31,6 +33,14 @@ app = FastAPI(title="Starpull API", lifespan=lifespan, docs_url="/docs" if docs 
 app.middleware("http")(security_middleware)
 for module in (auth, me, issues, saved, teams):
     app.include_router(module.router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError):
+    # FastAPI echoes the rejected value ("input") by default, which would send passwords back
+    # in response bodies; keep only where and why.
+    errors = [{"loc": e["loc"], "msg": e["msg"], "type": e["type"]} for e in exc.errors()]
+    return JSONResponse({"detail": errors}, status_code=422)
 
 
 @app.get("/health")
