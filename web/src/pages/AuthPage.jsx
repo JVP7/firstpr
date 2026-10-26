@@ -10,6 +10,10 @@ const OAUTH_ERRORS = {
   config: "GitHub sign-in isn't set up on this server yet.",
 }
 
+const NOTICES = {
+  deleted: 'Your account and everything linked to it were deleted.',
+}
+
 // Full-page navigation, not fetch: the API redirects to GitHub and back.
 const GithubButton = ({ children }) => (
   <a className="btn" href="/api/auth/github/start"><MarkGithubIcon size={16} />{children}</a>
@@ -22,6 +26,7 @@ export default function AuthPage({ mode }) {
   const [params] = useSearchParams()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(OAUTH_ERRORS[params.get('error')] ?? null)
+  const notice = params.get('deleted') ? NOTICES.deleted : null
 
   const onSubmit = async (e) => {
     e.preventDefault()
@@ -38,6 +43,7 @@ export default function AuthPage({ mode }) {
   }
 
   const errorText = error && <p className="error-text" role="alert">{error}</p>
+  const noticeText = notice && <p className="success-text" role="status">{notice}</p>
 
   if (signup && !pendingGithub) {
     return (
@@ -71,6 +77,7 @@ export default function AuthPage({ mode }) {
                 : 'Pick up where you left off.'}
             </p>
           </div>
+          {noticeText}
           {signup ? (
             <>
               <div className="field">

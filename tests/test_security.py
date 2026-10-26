@@ -119,3 +119,26 @@ def test_password_limit_counts_bytes():
 def test_load_sql_converts_placeholders_but_not_casts():
     sql = load_sql("advanced/stack_match")
     assert "%(user_id)s" in sql and "::numeric" in sql and ":user_id" not in sql
+
+
+@needs_db
+def test_ending_all_sessions_rejects_older_tokens(db):
+    import time
+    name = f"zz-test-{uuid.uuid4().hex[:8]}"
+    with pool.connection() as conn:
+        user_id = conn.execute("INSERT INTO users (github_username, email, password_hash) VALUES (%s, %s, 'x') "
+                               "RETURNING user_id", (name, f"{name}@example.com")).fetchone()["user_id"]
+    try:
+        before = Response()
+        auth.set_session(before, user_id)
+        old = cookie_from(before, auth.COOKIE)
+        time.sleep(1.1)  # iat has whole-second precision
+        auth.end_all_sessions(user_id)
+        with pytest.raises(HTTPException):
+            auth.current_user(CookieRequest({auth.COOKIE: old}))
+        after = Response()
+        auth.set_session(after, user_id)
+        assert auth.current_user(CookieRequest({auth.COOKIE: cookie_from(after, auth.COOKIE)}))["user_id"] == user_id
+    finally:
+        with pool.connection() as conn:
+            conn.execute("DELETE FROM users WHERE user_id = %s", (user_id,))

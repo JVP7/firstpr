@@ -9,6 +9,7 @@
   --primary: #16181d;
   --on-primary: #ffffff;
   --error: #b42318;
+  --on-error: #ffffff;
   --skeleton: #eceef0;
   --star: 22 24 29;
   --star-strength: 0.45;
@@ -30,6 +31,7 @@
     --primary: #e6e8ea;
     --on-primary: #0e1013;
     --error: #f97066;
+    --on-error: #0e1013;
     --skeleton: #1f2329;
     --star: 230 236 245;
     --star-strength: 1;
@@ -207,3 +209,32 @@ button, input, select { font: inherit; color: inherit; }
 .lang-option:hover { border-color: var(--muted); }
 .lang-option[aria-pressed='true'] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 .lang-option .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Footer */
+.footer { border-top: 1px solid var(--hairline); background: var(--canvas); }
+.footer-inner { max-width: 880px; margin: 0 auto; padding: 24px; display: grid; gap: 10px; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 14px; }
+.footer-links a { color: var(--muted); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
+.footer-links a:hover { color: var(--ink); text-decoration: underline; }
+.footer-note { font-size: 13px; color: var(--muted); }
+.nav-user .who { color: var(--muted); text-decoration: none; }
+.nav-user .who:hover { color: var(--ink); text-decoration: underline; }
+
+/* Account settings */
+.settings { display: grid; gap: 16px; }
+.settings .section form { display: grid; gap: 12px; max-width: 420px; }
+.settings .section p { font-size: 14px; color: var(--muted); max-width: 65ch; }
+.readonly { font: 500 15px var(--sans); display: flex; align-items: center; gap: 8px; }
+.success-text { color: var(--match); font-size: 14px; }
+.repo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.danger { border-color: var(--error); }
+.danger h2 { color: var(--error); }
+.danger-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.btn.destructive { background: var(--error); border-color: var(--error); color: var(--on-error); }
+.btn.destructive-outline { background: var(--surface); border-color: var(--hairline); color: var(--error); }
+.btn.destructive-outline:hover { border-color: var(--error); opacity: 1; }
+@media (max-width: 600px) { .footer-inner { padding: 20px 16px; } }
+.prose { display: grid; gap: 16px; }
+.prose .section ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px; }
+.prose .section p { font-size: 15px; max-width: 70ch; }
+.settings .section form .btn { justify-self: start; }
