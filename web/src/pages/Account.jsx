@@ -164,6 +164,10 @@ function DangerZone({ user, onDeleted }) {
         <div>
           <strong>Delete this account</strong>
           <p>Removes your account, linked repos, skills, saved issues and team memberships right away. This can't be undone.</p>
+          <p>
+            GitHub separately remembers that you approved Starpull. To remove that too, revoke Starpull under{' '}
+            <a href="https://github.com/settings/applications" target="_blank" rel="noreferrer">GitHub → Settings → Applications</a>.
+          </p>
         </div>
         {!open && <button className="btn destructive-outline" onClick={() => setOpen(true)}>Delete account</button>}
       </div>
