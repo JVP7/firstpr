@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: firstpr-design
+name: starpull-design
 description: A calm, dense tool for picking a first open-source issue. Neutral near-white (light) or near-black (dark) ground, near-black or near-white ink, and one green accent reserved for "why this matches you". System UI type, monospace only for package names. A sparse meteor shower drifts across the page background as the single signature motion.
 colors:
   canvas: "#F7F8F7"      # dark: "#0E1013"
@@ -27,7 +27,7 @@ components:
 ---
 
 ## Overview
-FirstPR is an app screen, not a marketing page. Every screen serves one decision: which issue to
+Starpull is an app screen, not a marketing page. Every screen serves one decision: which issue to
 pick up. Dense enough to scan 20 cards, quiet enough to read them.
 
 - One accent, green, and it only ever means "this matches your stack".

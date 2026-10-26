@@ -65,7 +65,7 @@ export default function AuthPage({ mode }) {
       <div className="auth">
         <form className="auth-card" onSubmit={onSubmit}>
           <div>
-            <h1>{signup ? 'Almost done' : 'Log in to FirstPR'}</h1>
+            <h1>{signup ? 'Almost done' : 'Log in to Starpull'}</h1>
             <p className="lede">
               {signup ? <>GitHub confirmed you as <strong>@{pendingGithub}</strong>. Add an email and password for logging in.</>
                 : 'Pick up where you left off.'}

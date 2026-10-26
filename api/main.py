@@ -1,4 +1,4 @@
-"""FirstPR API. Run locally with: uvicorn api.main:app --reload"""
+"""Starpull API. Run locally with: uvicorn api.main:app --reload"""
 
 import logging
 import os
@@ -25,7 +25,7 @@ async def lifespan(app):
 
 # Interactive docs are off unless ENABLE_DOCS=1 (they load scripts from a CDN and map the API).
 docs = os.getenv("ENABLE_DOCS") == "1"
-app = FastAPI(title="FirstPR API", lifespan=lifespan, docs_url="/docs" if docs else None,
+app = FastAPI(title="Starpull API", lifespan=lifespan, docs_url="/docs" if docs else None,
               redoc_url=None, openapi_url="/openapi.json" if docs else None)
 # No CORS: the frontend reaches the API through a same-origin /api proxy (Vite in dev, Vercel in prod).
 app.middleware("http")(security_middleware)

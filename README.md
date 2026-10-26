@@ -1,2 +1,5 @@
-# firstpr
-Matches beginner-friendly open source issues to the libraries you already use, and flags projects where maintainers don't respond.
+# Starpull
+
+Finds open, beginner-friendly issues in open-source projects that use the same packages you already do. Formerly FirstPR.
+
+Live: https://starpull.vercel.app

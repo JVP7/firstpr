@@ -18,7 +18,7 @@ export async function api(path, { method = 'GET', body } = {}) {
       body: body && JSON.stringify(body),
     })
   } catch {
-    throw new ApiError(0, "Can't reach the FirstPR server. Check your connection and try again.")
+    throw new ApiError(0, "Can't reach the Starpull server. Check your connection and try again.")
   }
   if (res.status === 401) window.dispatchEvent(new Event('firstpr:logout'))
   if (res.status === 204) return null
