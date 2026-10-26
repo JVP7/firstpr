@@ -47,6 +47,11 @@ export default function Privacy() {
           of every device, and delete your account. Deleting removes your account and everything listed under "What we store"
           immediately. Public information about open-source projects (issues, labels, stars) stays, because it isn't about you.
         </p>
+        <p>
+          GitHub keeps its own record that you approved Starpull, which is why signing in again skips GitHub's approval
+          screen. Starpull can't remove it for you, because we don't keep your GitHub token. Revoke it yourself under{' '}
+          <a href="https://github.com/settings/applications" target="_blank" rel="noreferrer">GitHub → Settings → Applications</a>.
+        </p>
       </section>
     </article>
   )

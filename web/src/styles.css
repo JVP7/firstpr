@@ -238,3 +238,4 @@ button, input, select { font: inherit; color: inherit; }
 .prose .section ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px; }
 .prose .section p { font-size: 15px; max-width: 70ch; }
 .settings .section form .btn { justify-self: start; }
+.danger-row p + p { margin-top: 8px; }
