@@ -36,6 +36,7 @@ ranked AS (
            i.number,
            i.title,
            r.primary_language,
+           r.stars,
            ROUND(sc.jaccard, 4) AS jaccard,
            (ul.primary_language IS NOT NULL) AS language_match,
            ROUND(0.8 * sc.jaccard + CASE WHEN ul.primary_language IS NOT NULL THEN 0.2 ELSE 0 END, 4) AS score,
@@ -50,7 +51,9 @@ ranked AS (
         SELECT 1 FROM user_repos ur WHERE ur.user_id = :user_id AND ur.repo_id = r.repo_id
     )
 )
-SELECT issue_id, full_name, number, title, primary_language, jaccard, language_match, score, shared_packages
+SELECT issue_id, full_name, number, title, primary_language, stars, jaccard, language_match, score, shared_packages,
+       ARRAY(SELECT l.name FROM issue_labels il JOIN labels l ON l.label_id = il.label_id
+             WHERE il.issue_id = ranked.issue_id ORDER BY l.name) AS labels
 FROM ranked
 WHERE repo_rank <= 3
 ORDER BY score DESC, created_at DESC
