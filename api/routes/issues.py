@@ -14,7 +14,7 @@ Languages = Annotated[list[Annotated[str, StringConstraints(min_length=1, max_le
 
 @router.get("/matches")
 def stack_matches(language: Languages = [], user=Depends(current_user), conn=Depends(get_conn)):
-    return run_file(conn, "advanced/stack_match", user_id=user["user_id"], languages=language or None)
+    return run_file(conn, "advanced/stack_match", user_id=user["user_id"], languages=language or None, limit=20)
 
 
 @router.get("/by-dependencies")

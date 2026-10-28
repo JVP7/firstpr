@@ -1,5 +1,5 @@
--- Example: user_id=1, languages=NULL (or '{Python,TypeScript}' to keep only those repo languages).
--- Expected: Top 20 open, unassigned issues ranked by 0.8 * Jaccard(user packages, repo packages)
+-- Example: user_id=1, languages=NULL (or '{Python,TypeScript}' to keep only those repo languages), limit=20.
+-- Expected: The top <limit> open, unassigned issues ranked by 0.8 * Jaccard(user packages, repo packages)
 -- + 0.2 if the repo's language matches one of the user's repos; only repos sharing a package qualify.
 -- Every issue in a repo scores the same, so at most 3 (the newest) are kept per repo.
 WITH user_pkgs AS (
@@ -58,4 +58,4 @@ SELECT issue_id, full_name, number, title, primary_language, stars, jaccard, lan
 FROM ranked
 WHERE repo_rank <= 3
 ORDER BY score DESC, created_at DESC
-LIMIT 20;
+LIMIT :limit;
