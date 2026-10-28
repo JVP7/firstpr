@@ -15,7 +15,7 @@ from pydantic import ValidationError  # noqa: E402
 from fastapi import HTTPException, Response  # noqa: E402
 
 from api import auth, security  # noqa: E402
-from api.db import load_sql, pool  # noqa: E402
+from api.db import describe_run, load_sql, pool  # noqa: E402
 from api.models import SignupIn  # noqa: E402
 
 needs_db = pytest.mark.skipif(os.environ["DATABASE_URL"] == "postgresql://unused", reason="no DATABASE_URL")
@@ -222,3 +222,9 @@ def test_validation_errors_never_echo_passwords():
         resp = client.post(path, json=body)
         assert resp.status_code == 422
         assert secret not in resp.text and "input" not in resp.json()["detail"][0]
+
+
+def test_sql_log_hides_emails_and_password_hashes():
+    line = describe_run("basic/user_insert", {"github_username": "octocat", "email": "a@b.co", "password_hash": "$2b$x"}, 1)
+    assert "octocat" in line and "INSERT INTO users" in line
+    assert "a@b.co" not in line and "$2b$x" not in line

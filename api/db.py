@@ -1,5 +1,6 @@
 """Postgres connection pool and helpers for running the files in sql/."""
 
+import logging
 import os
 import re
 from functools import cache
@@ -11,6 +12,10 @@ from psycopg_pool import ConnectionPool
 SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
 # `:name` placeholders as used with psql; the lookbehind skips `::type` casts.
 PLACEHOLDER = re.compile(r"(?<!:):([A-Za-z_]\w*)")
+# SQL_LOG=1 prints every sql/ file the API runs, so a live demo can show the SQL behind each click.
+SQL_LOG = os.getenv("SQL_LOG") == "1"
+HIDDEN_PARAMS = {"email", "password_hash"}
+log = logging.getLogger("starpull.sql")
 
 pool = ConnectionPool(
     os.environ["DATABASE_URL"],
@@ -27,17 +32,30 @@ pool = ConnectionPool(
 
 
 @cache
+def sql_text(name):
+    """sql/<name>.sql without its comment lines, placeholders left as written."""
+    lines = (SQL_DIR / f"{name}.sql").read_text().splitlines()
+    return "\n".join(line for line in lines if not line.lstrip().startswith("--")).strip()
+
+
+@cache
 def load_sql(name):
     """Read sql/<name>.sql and convert it to psycopg's %(name)s style."""
-    text = (SQL_DIR / f"{name}.sql").read_text()
-    lines = [line for line in text.splitlines() if not line.lstrip().startswith("--")]
-    return PLACEHOLDER.sub(r"%(\1)s", "\n".join(lines).replace("%", "%%"))
+    return PLACEHOLDER.sub(r"%(\1)s", sql_text(name).replace("%", "%%"))
 
 
 def run_file(conn, file, /, **params):
     """Run a sql/ file and return all rows (empty for statements without RETURNING)."""
     cur = conn.execute(load_sql(file), params)
-    return cur.fetchall() if cur.description else []
+    rows = cur.fetchall() if cur.description else []
+    if SQL_LOG:
+        log.info(describe_run(file, params, len(rows) if cur.description else cur.rowcount))
+    return rows
+
+
+def describe_run(file, params, count):
+    shown = ", ".join(f"{k}={'<hidden>' if k in HIDDEN_PARAMS else v!r}" for k, v in params.items())
+    return f"sql/{file}.sql  ({shown})  -> {count} row(s)\n{sql_text(file)}\n"
 
 
 def get_conn():
