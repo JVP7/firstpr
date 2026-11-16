@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CheckIcon, DotFillIcon, IssueOpenedIcon, ShieldCheckIcon, StarIcon } from '@primer/octicons-react'
+import { CheckIcon, ClockIcon, CommentDiscussionIcon, DotFillIcon, IssueOpenedIcon, ShieldCheckIcon, StarIcon } from '@primer/octicons-react'
 
 // GitHub linguist colors for the languages in the seed list.
 const LANG_COLORS = { Python: '#3572A5', JavaScript: '#f1e05a', TypeScript: '#3178c6', 'Jupyter Notebook': '#DA5B0B', HTML: '#e34c26' }
@@ -55,7 +55,15 @@ export function LanguageFilter({ options, selected, onToggle, onClear, label = '
   )
 }
 
-export function RepoLine({ repo, language, stars }) {
+// score is the repo's responsiveness percentile (0 to 1); only the top and bottom thirds get a badge.
+export function Pace({ score }) {
+  if (score == null || (score > 1 / 3 && score < 2 / 3)) return null
+  return score >= 2 / 3
+    ? <span className="pace good"><CommentDiscussionIcon size={14} />Responsive maintainers</span>
+    : <span className="pace"><ClockIcon size={14} />Slow to respond</span>
+}
+
+export function RepoLine({ repo, language, stars, pace }) {
   return (
     <div className="repo-line">
       {language && <><LangDot language={language} /><span className="sr-only">{language}:</span></>}
@@ -66,6 +74,7 @@ export function RepoLine({ repo, language, stars }) {
           {compact.format(stars)}
         </span>
       )}
+      <Pace score={pace} />
     </div>
   )
 }
@@ -95,7 +104,7 @@ export function MatchLine({ shared, languageMatch }) {
 export function IssueCard({ issue }) {
   return (
     <li className="card">
-      <RepoLine repo={issue.full_name} language={issue.primary_language} stars={issue.stars} />
+      <RepoLine repo={issue.full_name} language={issue.primary_language} stars={issue.stars} pace={issue.responsiveness} />
       <Link className="card-title" to={`/issues/${issue.issue_id}`} state={{ shared: issue.shared_packages }}>
         {issue.title} <span className="num">#{issue.number}</span>
       </Link>

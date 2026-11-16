@@ -6,6 +6,22 @@ import { useLoad } from '../useLoad'
 import { ErrorState, Labels, RepoLine, Skeletons, timeAgo } from '../components'
 
 const MAINTAINER = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
+const percent = (rate) => `${Math.round(rate * 100)}%`
+const duration = (hours) => (hours < 48 ? `${Math.max(1, Math.round(hours))} hours` : `${Math.round(hours / 24)} days`)
+
+function paceSummary(i) {
+  if (i.responsiveness == null) return 'Not enough activity in the last 90 days to judge how quickly maintainers respond.'
+  const parts = []
+  if (i.reply_rate != null) {
+    parts.push(`replied to ${percent(i.reply_rate)} of new issues` +
+      (i.median_reply_hours != null ? ` (typically within ${duration(i.median_reply_hours)})` : ''))
+  }
+  if (i.merge_rate != null) parts.push(`merged ${percent(i.merge_rate)} of outside pull requests`)
+  const rank = i.responsiveness >= 0.5
+    ? `more responsive than ${percent(i.responsiveness)}`
+    : `less responsive than ${percent(1 - i.responsiveness)}`
+  return `In the last 90 days, maintainers ${parts.join(' and ')}. That's ${rank} of the projects Starpull tracks.`
+}
 
 export default function IssueDetail() {
   const { issueId } = useParams()
@@ -34,7 +50,7 @@ export default function IssueDetail() {
     <article className="detail">
       <button className="back btn quiet" onClick={() => navigate(-1)}><ArrowLeftIcon size={16} />Back</button>
       <div style={{ display: 'grid', gap: 10 }}>
-        <RepoLine repo={i.full_name} language={i.primary_language} stars={i.stars} />
+        <RepoLine repo={i.full_name} language={i.primary_language} stars={i.stars} pace={i.responsiveness} />
         <h1>{i.title} <span className="muted" style={{ fontWeight: 400 }}>#{i.number}</span></h1>
         <p className="muted" style={{ fontSize: 14 }}>Opened {timeAgo(i.created_at)} · {i.is_assigned ? 'Assigned' : 'Nobody assigned'}</p>
         <Labels labels={i.labels} max={10} />
@@ -61,6 +77,7 @@ export default function IssueDetail() {
       </section>
       <section className="section" aria-labelledby="act-h">
         <h2 id="act-h">Recent activity</h2>
+        <p style={{ fontSize: 14 }}>{paceSummary(i)}</p>
         {i.comments.length ? (
           <>
             <p className="muted" style={{ fontSize: 14 }}>
