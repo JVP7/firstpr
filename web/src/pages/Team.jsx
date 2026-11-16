@@ -39,7 +39,8 @@ function Members({ team, me, isOwner, onChanged, onLeft }) {
           <li key={m.user_id}>
             <strong>@{m.github_username}</strong>
             {m.role === 'owner' && <span className="role">Owner</span>}
-            {(m.user_id === me || isOwner) && (
+            {/* Owners delete the team instead of leaving, so a team is never left without an owner. */}
+            {(m.user_id === me ? m.role !== 'owner' : isOwner) && (
               <button className="btn quiet small" onClick={() => remove(m)}>
                 {m.user_id === me ? 'Leave team' : 'Remove'}
               </button>
@@ -108,6 +109,48 @@ function Progress({ teamId }) {
   )
 }
 
+function DeleteTeam({ team, onDeleted }) {
+  const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [state, setState] = useState({ busy: false, error: null })
+  const onSubmit = async (e) => {
+    e.preventDefault()
+    setState({ busy: true, error: null })
+    try {
+      await api(`/teams/${team.team_id}`, { method: 'DELETE' })
+      onDeleted()
+    } catch (err) {
+      setState({ busy: false, error: err.message })
+    }
+  }
+  return (
+    <section className="section danger" aria-labelledby="del-team-h">
+      <h2 id="del-team-h">Danger zone</h2>
+      <div className="danger-row">
+        <div>
+          <strong>Delete this team</strong>
+          <p>Removes the team and its member list for everyone. Members keep their own saved issues.</p>
+        </div>
+        {!open && <button className="btn destructive-outline" onClick={() => setOpen(true)}>Delete team</button>}
+      </div>
+      {open && (
+        <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12, maxWidth: 420 }}>
+          <div className="field">
+            <label htmlFor="confirm-team">Type <strong>{team.name}</strong> to confirm</label>
+            <input className="input" id="confirm-team" required autoComplete="off" spellCheck={false}
+              value={typed} onChange={(e) => setTyped(e.target.value)} />
+          </div>
+          {state.error && <p className="error-text" role="alert">{state.error}</p>}
+          <div className="actions">
+            <button className="btn destructive" type="submit" disabled={typed !== team.name || state.busy}>Delete team permanently</button>
+            <button className="btn quiet" type="button" onClick={() => { setOpen(false); setTyped('') }}>Cancel</button>
+          </div>
+        </form>
+      )}
+    </section>
+  )
+}
+
 export default function Team() {
   const { teamId } = useParams()
   const navigate = useNavigate()
@@ -128,6 +171,7 @@ export default function Team() {
       <div className="teams">
         <Members team={t} me={user.user_id} isOwner={isOwner} onChanged={team.reload} onLeft={() => navigate('/teams')} />
         <Progress teamId={t.team_id} />
+        {isOwner && <DeleteTeam team={t} onDeleted={() => navigate('/teams')} />}
       </div>
     </>
   )

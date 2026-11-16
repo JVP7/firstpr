@@ -228,7 +228,7 @@ button, input, select { font: inherit; color: inherit; }
 /* Account settings */
 .settings, .teams { display: grid; gap: 16px; }
 .settings .section form { display: grid; gap: 12px; max-width: 420px; }
-.settings .section p { font-size: 14px; color: var(--muted); max-width: 65ch; }
+.settings .section p, .teams .section p { font-size: 14px; color: var(--muted); max-width: 65ch; }
 .readonly { font: 500 15px var(--sans); display: flex; align-items: center; gap: 8px; }
 .success-text { color: var(--match); font-size: 14px; }
 .repo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
