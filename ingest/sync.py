@@ -17,6 +17,7 @@ BEGINNER_LABEL = re.compile(r"good.?first|first.?timer|beginner|newcomer|starter
 
 RECENT_ISSUE_PAGES = 2   # most recently updated open issues, 100 per page
 BEGINNER_ISSUE_PAGES = 3  # per beginner label
+CHANGED_ISSUE_PAGES = 10  # issues of any state updated since the last sync
 COMMENT_PAGES = 5
 PR_PAGES = 5
 HISTORY_DAYS = 90
@@ -24,11 +25,13 @@ HISTORY_DAYS = 90
 
 def sync_repo(gh, conn, full_name, issues=True):
     """Upsert one repo and return its repo_id, or None if GitHub can't find it."""
-    data = fetch_repo(gh, full_name, issues)
+    with conn.transaction():  # closed right away, so write_repo's transaction is a real one, not a savepoint
+        row = conn.execute("SELECT last_synced_at FROM repos WHERE lower(full_name) = lower(%s)", (full_name,)).fetchone()
+    data = fetch_repo(gh, full_name, issues, since=row[0] if row else None)
     return write_repo(conn, data) if data else None
 
 
-def fetch_repo(gh, full_name, issues=True):
+def fetch_repo(gh, full_name, issues=True, since=None):
     """Everything GitHub has for one repo, without touching the database. None if not found."""
     resp = gh.get(f"/repos/{full_name}")
     if resp is None:
@@ -39,7 +42,7 @@ def fetch_repo(gh, full_name, issues=True):
     data = {"repo": repo, "deps": _fetch_dependencies(gh, full_name), "issues": issues}
     if issues:
         data["labels"] = list(gh.paginate(f"/repos/{full_name}/labels"))
-        data["open_issues"] = _fetch_open_issues(gh, full_name, data["labels"])
+        data["open_issues"] = _fetch_issues(gh, full_name, data["labels"], since)
         data["comments"] = _fetch_comments(gh, full_name)
         data["pulls"] = _fetch_recent_pulls(gh, full_name)
     return data
@@ -84,13 +87,16 @@ def _fetch_dependencies(gh, full_name):
     return deps
 
 
-def _fetch_open_issues(gh, full_name, labels):
-    """Recently updated open issues plus every open issue with a beginner label."""
+def _fetch_issues(gh, full_name, labels, since=None):
+    """Recently updated open issues, every open issue with a beginner label, and, on a re-sync, every
+    issue changed since `since` in any state, so issues closed or assigned on GitHub stop showing as open."""
     found = {}
     path = f"/repos/{full_name}/issues"
     batches = [gh.paginate(path, {"state": "open", "sort": "updated"}, RECENT_ISSUE_PAGES)]
     batches += [gh.paginate(path, {"state": "open", "labels": label["name"]}, BEGINNER_ISSUE_PAGES)
                 for label in labels if BEGINNER_LABEL.search(label["name"])]
+    if since:
+        batches.append(gh.paginate(path, {"state": "all", "since": since.isoformat()}, CHANGED_ISSUE_PAGES))
     for batch in batches:
         for issue in batch:
             if "pull_request" not in issue:  # the issues endpoint also returns PRs
