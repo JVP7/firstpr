@@ -1,0 +1,33 @@
+# Re-syncs every seed repo from GitHub once a day: new issues, issues closed or assigned since the
+# last run, comments and pull requests, then refreshes repo_responsiveness. About 6,000 GitHub
+# requests, so it can wait out the hourly limit; the timeout leaves room for that.
+name: Refresh data
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-data
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Sync seed repos
+        run: python -m ingest.seed_load
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Secrets can't start with GITHUB_, so the ingest token is stored under another name.
+          GITHUB_TOKEN: ${{ secrets.INGEST_GITHUB_TOKEN }}
