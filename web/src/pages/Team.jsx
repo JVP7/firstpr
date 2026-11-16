@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from '@primer/octicons-react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { useLoad } from '../useLoad'
-import { ErrorState, Skeletons } from '../components'
+import { ErrorState, Labels, Skeletons } from '../components'
 import { STATUSES } from './Saved'
 
 function Members({ team, me, isOwner, onChanged, onLeft }) {
@@ -109,6 +109,101 @@ function Progress({ teamId }) {
   )
 }
 
+function Target({ team, isOwner, onChanged }) {
+  const [state, setState] = useState({ busy: false, error: null })
+  const onSubmit = async (e) => {
+    e.preventDefault()
+    setState({ busy: true, error: null })
+    try {
+      const fullName = new FormData(e.currentTarget).get('full_name').trim()
+      await api(`/teams/${team.team_id}/target`, { method: 'PUT', body: { full_name: fullName || null } })
+      setState({ busy: false, error: null })
+      onChanged()
+    } catch (err) {
+      setState({ busy: false, error: err.message })
+    }
+  }
+  return (
+    <section className="section" aria-labelledby="target-h">
+      <h2 id="target-h">Target project</h2>
+      <p>
+        {team.target_repo
+          ? <>The team is contributing to <Link to={`/search?q=${encodeURIComponent(team.target_repo)}`}><strong>{team.target_repo}</strong></Link>.</>
+          : 'No project picked yet. Pick one to split its open issues across the team.'}
+      </p>
+      {isOwner && (
+        <form className="inline-form" onSubmit={onSubmit}>
+          <label className="sr-only" htmlFor="target">Repo (owner/name)</label>
+          <input className="input" id="target" name="full_name" key={team.target_repo} defaultValue={team.target_repo ?? ''}
+            placeholder="owner/name, e.g. pallets/flask" autoComplete="off" autoCapitalize="none" spellCheck={false} />
+          <button className="btn secondary" type="submit" disabled={state.busy}>Save</button>
+        </form>
+      )}
+      {state.error && <p className="error-text" role="alert">{state.error}</p>}
+    </section>
+  )
+}
+
+function Split({ team, isOwner }) {
+  const assignments = useLoad(() => api(`/teams/${team.team_id}/assignments`), [team.team_id, team.target_repo])
+  const [state, setState] = useState({ busy: false, error: null })
+  const onSubmit = async (e) => {
+    e.preventDefault()
+    setState({ busy: true, error: null })
+    try {
+      const perMember = Number(new FormData(e.currentTarget).get('per_member'))
+      assignments.setData(await api(`/teams/${team.team_id}/split`, { method: 'POST', body: { per_member: perMember } }))
+      setState({ busy: false, error: null })
+    } catch (err) {
+      setState({ busy: false, error: err.message })
+    }
+  }
+  const byMember = new Map()
+  for (const a of assignments.data ?? []) {
+    byMember.set(a.github_username, [...(byMember.get(a.github_username) ?? []), a])
+  }
+
+  return (
+    <section className="section" aria-labelledby="split-h">
+      <h2 id="split-h">Issue split</h2>
+      <p>Each member gets an equal share of {team.target_repo}'s open issues. Members who know less of its stack get the beginner issues first.</p>
+      {isOwner && (
+        <form className="inline-form" onSubmit={onSubmit}>
+          <label className="sr-only" htmlFor="per-member">Issues per member</label>
+          <select className="select" id="per-member" name="per_member" defaultValue="3">
+            {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} per member</option>)}
+          </select>
+          <button className="btn" type="submit" disabled={state.busy}>{byMember.size ? 'Split again' : 'Split issues'}</button>
+        </form>
+      )}
+      {state.error && <p className="error-text" role="alert">{state.error}</p>}
+      {assignments.loading ? (
+        <Skeletons count={1} />
+      ) : assignments.error ? (
+        <ErrorState error={assignments.error} onRetry={assignments.reload} />
+      ) : byMember.size === 0 ? (
+        <p>{isOwner ? 'Nothing assigned yet.' : 'Nothing assigned yet. The team owner can split the issues.'}</p>
+      ) : (
+        <div className="split">
+          {[...byMember].map(([username, items]) => (
+            <div key={username}>
+              <h3>@{username} <span className="muted">· {items.length}</span></h3>
+              <ul className="list">
+                {items.map((a) => (
+                  <li key={a.issue_id} className="card">
+                    <Link className="card-title" to={`/issues/${a.issue_id}`}>{a.title} <span className="num">#{a.number}</span></Link>
+                    <Labels labels={a.labels} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function DeleteTeam({ team, onDeleted }) {
   const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')
@@ -170,6 +265,8 @@ export default function Team() {
       </div>
       <div className="teams">
         <Members team={t} me={user.user_id} isOwner={isOwner} onChanged={team.reload} onLeft={() => navigate('/teams')} />
+        <Target team={t} isOwner={isOwner} onChanged={team.reload} />
+        {t.target_repo && <Split team={t} isOwner={isOwner} />}
         <Progress teamId={t.team_id} />
         {isOwner && <DeleteTeam team={t} onDeleted={() => navigate('/teams')} />}
       </div>

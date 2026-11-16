@@ -67,6 +67,14 @@ class TeamIn(BaseModel):
     target_repo_id: int | None = Field(None, ge=1, le=2**63 - 1)
 
 
+class TeamTargetIn(BaseModel):
+    full_name: str | None = Field(None, min_length=3, max_length=140, pattern=r"^[\w.-]+/[\w.-]+$")
+
+
+class TeamSplitIn(BaseModel):
+    per_member: int = Field(3, ge=1, le=10)
+
+
 class TeamMemberIn(BaseModel):
     github_username: str = Field(min_length=1, max_length=39)
     role: Literal["owner", "member"] = "member"

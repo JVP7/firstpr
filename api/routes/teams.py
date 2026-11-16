@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import current_user
 from api.db import get_conn, run_file
-from api.models import TeamIn, TeamMemberIn
+from api.models import TeamIn, TeamMemberIn, TeamSplitIn, TeamTargetIn
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -44,7 +44,8 @@ def create_team(body: TeamIn, user=Depends(current_user), conn=Depends(get_conn)
 @router.get("/{team_id}")
 def team_detail(team_id: int, user=Depends(current_user), conn=Depends(get_conn)):
     _role(conn, team_id, user["user_id"])
-    team = conn.execute("SELECT team_id, name, created_by, target_repo_id FROM teams WHERE team_id = %s",
+    team = conn.execute("SELECT t.team_id, t.name, t.created_by, t.target_repo_id, r.full_name AS target_repo "
+                        "FROM teams t LEFT JOIN repos r ON r.repo_id = t.target_repo_id WHERE t.team_id = %s",
                         (team_id,)).fetchone()
     team["members"] = conn.execute(
         "SELECT u.user_id, u.github_username, tm.role FROM team_members tm "
@@ -84,3 +85,34 @@ def remove_member(team_id: int, user_id: int, user=Depends(current_user), conn=D
 def team_saved(team_id: int, user=Depends(current_user), conn=Depends(get_conn)):
     _role(conn, team_id, user["user_id"])
     return run_file(conn, "advanced/team_saved_issues", team_id=team_id)
+
+
+@router.put("/{team_id}/target")
+def set_target(team_id: int, body: TeamTargetIn, user=Depends(current_user), conn=Depends(get_conn)):
+    _require_owner(conn, team_id, user["user_id"])
+    repo_id = None
+    if body.full_name:
+        repo = conn.execute("SELECT repo_id FROM repos WHERE lower(full_name) = lower(%s)", (body.full_name,)).fetchone()
+        if repo is None:
+            raise HTTPException(404, "Starpull doesn't track that repo yet")
+        repo_id = repo["repo_id"]
+    # Assignments belong to the old target, so a new target starts clean.
+    run_file(conn, "basic/team_assignments_clear", team_id=team_id)
+    [team] = run_file(conn, "basic/team_set_target", team_id=team_id, target_repo_id=repo_id)
+    return team
+
+
+@router.post("/{team_id}/split")
+def split_issues(team_id: int, body: TeamSplitIn, user=Depends(current_user), conn=Depends(get_conn)):
+    _require_owner(conn, team_id, user["user_id"])
+    if conn.execute("SELECT target_repo_id FROM teams WHERE team_id = %s", (team_id,)).fetchone()["target_repo_id"] is None:
+        raise HTTPException(409, "Pick a target repo first")
+    run_file(conn, "basic/team_assignments_clear", team_id=team_id)
+    run_file(conn, "advanced/team_issue_split", team_id=team_id, per_member=body.per_member)
+    return run_file(conn, "advanced/team_assignments", team_id=team_id)
+
+
+@router.get("/{team_id}/assignments")
+def team_assignments(team_id: int, user=Depends(current_user), conn=Depends(get_conn)):
+    _role(conn, team_id, user["user_id"])
+    return run_file(conn, "advanced/team_assignments", team_id=team_id)
