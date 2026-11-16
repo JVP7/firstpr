@@ -228,3 +228,14 @@ def test_sql_log_hides_emails_and_password_hashes():
     line = describe_run("basic/user_insert", {"github_username": "octocat", "email": "a@b.co", "password_hash": "$2b$x"}, 1)
     assert "octocat" in line and "INSERT INTO users" in line
     assert "a@b.co" not in line and "$2b$x" not in line
+
+
+@needs_db
+def test_responsiveness_scores_are_percentiles(db):
+    with pool.connection() as conn:
+        rows = conn.execute("SELECT recent_issues, closed_prs, score FROM repo_responsiveness").fetchall()
+    assert rows
+    for row in rows:
+        has_samples = row["recent_issues"] > 0 or row["closed_prs"] > 0
+        assert (row["score"] is not None) == has_samples
+        assert row["score"] is None or 0 <= row["score"] <= 1

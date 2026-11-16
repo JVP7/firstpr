@@ -39,8 +39,10 @@ def issue_detail(issue_id: int = Path(ge=1, le=2**63 - 1), conn=Depends(get_conn
     issue = conn.execute(
         "SELECT i.issue_id, i.number, i.title, i.state, i.created_at, i.is_assigned, "
         "       r.repo_id, r.full_name, r.primary_language, r.stars, "
-        "       'https://github.com/' || r.full_name || '/issues/' || i.number AS url "
-        "FROM issues i JOIN repos r ON r.repo_id = i.repo_id WHERE i.issue_id = %s",
+        "       'https://github.com/' || r.full_name || '/issues/' || i.number AS url, "
+        "       rr.score AS responsiveness, rr.reply_rate, rr.median_reply_hours, rr.merge_rate "
+        "FROM issues i JOIN repos r ON r.repo_id = i.repo_id "
+        "LEFT JOIN repo_responsiveness rr ON rr.repo_id = r.repo_id WHERE i.issue_id = %s",
         (issue_id,)).fetchone()
     if issue is None:
         raise HTTPException(404, "Issue not found")

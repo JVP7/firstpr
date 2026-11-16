@@ -59,6 +59,11 @@ def main():
             log.exception("[%d/%d] %s failed", i, len(names), name)
             failed.append(name)
 
+    if conn.closed:
+        conn = connect()
+    conn.execute("REFRESH MATERIALIZED VIEW repo_responsiveness")
+    conn.commit()
+
     log.info("Done in %.0fs: %d synced, %d failed %s",
              time.monotonic() - start, len(names) - len(failed), len(failed), failed or "")
     for table, count in table_counts(conn).items():

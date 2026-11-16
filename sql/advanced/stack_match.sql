@@ -1,6 +1,7 @@
 -- Example: user_id=1, languages=NULL (or '{Python,TypeScript}' to keep only those repo languages), limit=20.
 -- Expected: The top <limit> open, unassigned issues ranked by 0.8 * Jaccard(user packages, repo packages)
--- + 0.2 if the repo's language matches one of the user's repos; only repos sharing a package qualify.
+-- + 0.2 if the repo's language matches one of the user's repos, scaled by 0.75 to 1.25 with the repo's
+-- responsiveness (1.0 when unknown); only repos sharing a package qualify.
 -- Every issue in a repo scores the same, so at most 3 (the newest) are kept per repo.
 WITH user_pkgs AS (
     SELECT package_id FROM user_dependencies WHERE user_id = :user_id
@@ -39,7 +40,12 @@ ranked AS (
            r.stars,
            ROUND(sc.jaccard, 4) AS jaccard,
            (ul.primary_language IS NOT NULL) AS language_match,
-           ROUND(0.8 * sc.jaccard + CASE WHEN ul.primary_language IS NOT NULL THEN 0.2 ELSE 0 END, 4) AS score,
+           ROUND((0.8 * sc.jaccard + CASE WHEN ul.primary_language IS NOT NULL THEN 0.2 ELSE 0 END)
+                 * (0.75 + 0.5 * COALESCE(rr.score, 0.5)), 4) AS score,
+           rr.score AS responsiveness,
+           rr.reply_rate,
+           rr.median_reply_hours,
+           rr.merge_rate,
            sc.shared_packages,
            i.created_at,
            ROW_NUMBER() OVER (PARTITION BY r.repo_id ORDER BY i.created_at DESC) AS repo_rank
@@ -47,12 +53,14 @@ ranked AS (
     JOIN repos r ON r.repo_id = sc.repo_id AND NOT r.is_archived
     JOIN issues i ON i.repo_id = r.repo_id AND i.state = 'open' AND NOT i.is_assigned
     LEFT JOIN user_langs ul ON ul.primary_language = r.primary_language
+    LEFT JOIN repo_responsiveness rr ON rr.repo_id = r.repo_id
     WHERE NOT EXISTS (
         SELECT 1 FROM user_repos ur WHERE ur.user_id = :user_id AND ur.repo_id = r.repo_id
     )
       AND (CAST(:languages AS text[]) IS NULL OR r.primary_language = ANY (CAST(:languages AS text[])))
 )
 SELECT issue_id, full_name, number, title, primary_language, stars, jaccard, language_match, score, shared_packages,
+       responsiveness, reply_rate, median_reply_hours, merge_rate,
        ARRAY(SELECT l.name FROM issue_labels il JOIN labels l ON l.label_id = il.label_id
              WHERE il.issue_id = ranked.issue_id ORDER BY l.name) AS labels
 FROM ranked
