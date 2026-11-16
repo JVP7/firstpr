@@ -136,7 +136,7 @@ button, input, select { font: inherit; color: inherit; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-remove { display: inline-flex; align-items: center; gap: 2px; }
 .chip-remove button { border: 0; background: none; padding: 0 2px; cursor: pointer; color: var(--muted); display: inline-flex; min-height: 24px; align-items: center; }
-.add-skill { display: flex; gap: 8px; max-width: 420px; }
+.add-skill, .inline-form { display: flex; gap: 8px; max-width: 420px; }
 
 /* States */
 .empty { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: 28px; display: grid; gap: 10px; justify-items: start; }
@@ -161,11 +161,14 @@ button, input, select { font: inherit; color: inherit; }
 .muted { color: var(--muted); }
 .back { justify-self: start; padding-left: 0; font-size: 14px; color: var(--muted); text-decoration: none; display: inline-flex; gap: 4px; align-items: center; }
 .back:hover { color: var(--ink); }
+.members { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.members li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; min-height: 30px; }
+.members .btn { margin-left: auto; }
 
 /* Saved board */
 .board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .column { display: grid; gap: 8px; }
-.column h2 { font-size: 13px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; padding: 0 2px; }
+.column h2, .column h3 { font-size: 13px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; padding: 0 2px; }
 .column .card { padding: 12px; gap: 8px; }
 .column .card-title { font-size: 14px; }
 .column .empty-col { font-size: 13px; color: var(--muted); border: 1px dashed var(--hairline); border-radius: var(--r-md); padding: 12px; background: var(--surface); }
@@ -179,15 +182,18 @@ button, input, select { font: inherit; color: inherit; }
   .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
   .tabs button { flex: none; border: 1px solid var(--hairline); background: var(--surface); border-radius: var(--r-md); height: 36px; padding: 0 12px; font-size: 13px; font-weight: 500; cursor: pointer; }
   .tabs button[aria-selected='true'] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
-  .column h2 { display: none; }
+  .column h2, .column h3 { display: none; }
 }
 
 @media (max-width: 600px) {
   .nav-inner, .page { padding: 0 16px; }
   .page { padding-top: 24px; padding-bottom: 56px; }
   .nav-inner { gap: 8px; }
-  .nav-links a { padding: 6px 8px; }
+  .nav-links { gap: 0; }
+  .nav-links a { padding: 6px; font-size: 13px; }
   .nav-user .who { display: none; }
+  /* Four links and Log out don't fit next to the name at phone width; the logo stays. */
+  .nav .wordmark-text { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .search-form { grid-template-columns: minmax(0, 1fr); }
   .auth { margin-top: 24px; }
   .auth-card { padding: 20px; }
@@ -223,9 +229,9 @@ button, input, select { font: inherit; color: inherit; }
 .nav-user .who:hover { color: var(--ink); text-decoration: underline; }
 
 /* Account settings */
-.settings { display: grid; gap: 16px; }
+.settings, .teams { display: grid; gap: 16px; }
 .settings .section form { display: grid; gap: 12px; max-width: 420px; }
-.settings .section p { font-size: 14px; color: var(--muted); max-width: 65ch; }
+.settings .section p, .teams .section p { font-size: 14px; color: var(--muted); max-width: 65ch; }
 .readonly { font: 500 15px var(--sans); display: flex; align-items: center; gap: 8px; }
 .success-text { color: var(--match); font-size: 14px; }
 .repo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
