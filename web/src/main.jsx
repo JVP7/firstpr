@@ -10,6 +10,7 @@ import Search from './pages/Search'
 import IssueDetail from './pages/IssueDetail'
 import Saved from './pages/Saved'
 import Teams from './pages/Teams'
+import Team from './pages/Team'
 import Account from './pages/Account'
 import Privacy from './pages/Privacy'
 import './styles.css'
@@ -106,6 +107,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="issues/:issueId" element={<IssueDetail />} />
             <Route path="saved" element={<Saved />} />
             <Route path="teams" element={<Teams />} />
+            <Route path="teams/:teamId" element={<Team />} />
             <Route path="account" element={<Account />} />
           </Route>
           <Route path="/privacy" element={<OpenPage><Privacy /></OpenPage>} />
