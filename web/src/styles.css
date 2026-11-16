@@ -136,7 +136,7 @@ button, input, select { font: inherit; color: inherit; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-remove { display: inline-flex; align-items: center; gap: 2px; }
 .chip-remove button { border: 0; background: none; padding: 0 2px; cursor: pointer; color: var(--muted); display: inline-flex; min-height: 24px; align-items: center; }
-.add-skill { display: flex; gap: 8px; max-width: 420px; }
+.add-skill, .inline-form { display: flex; gap: 8px; max-width: 420px; }
 
 /* States */
 .empty { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-md); padding: 28px; display: grid; gap: 10px; justify-items: start; }
@@ -223,7 +223,7 @@ button, input, select { font: inherit; color: inherit; }
 .nav-user .who:hover { color: var(--ink); text-decoration: underline; }
 
 /* Account settings */
-.settings { display: grid; gap: 16px; }
+.settings, .teams { display: grid; gap: 16px; }
 .settings .section form { display: grid; gap: 12px; max-width: 420px; }
 .settings .section p { font-size: 14px; color: var(--muted); max-width: 65ch; }
 .readonly { font: 500 15px var(--sans); display: flex; align-items: center; gap: 8px; }

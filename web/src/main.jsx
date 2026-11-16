@@ -9,6 +9,7 @@ import Matches from './pages/Matches'
 import Search from './pages/Search'
 import IssueDetail from './pages/IssueDetail'
 import Saved from './pages/Saved'
+import Teams from './pages/Teams'
 import Account from './pages/Account'
 import Privacy from './pages/Privacy'
 import './styles.css'
@@ -26,6 +27,7 @@ function Footer() {
               <Link to="/">Matches</Link>
               <Link to="/search">Search</Link>
               <Link to="/saved">Saved</Link>
+              <Link to="/teams">Teams</Link>
               <Link to="/account">Account settings</Link>
             </>
           )}
@@ -53,6 +55,7 @@ function Shell() {
             <NavLink to="/" end>Matches</NavLink>
             <NavLink to="/search">Search</NavLink>
             <NavLink to="/saved">Saved</NavLink>
+            <NavLink to="/teams">Teams</NavLink>
           </nav>
           <div className="nav-user">
             <Link to="/account" className="who">@{user.github_username}</Link>
@@ -102,6 +105,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="search" element={<Search />} />
             <Route path="issues/:issueId" element={<IssueDetail />} />
             <Route path="saved" element={<Saved />} />
+            <Route path="teams" element={<Teams />} />
             <Route path="account" element={<Account />} />
           </Route>
           <Route path="/privacy" element={<OpenPage><Privacy /></OpenPage>} />
