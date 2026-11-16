@@ -21,13 +21,6 @@ from api.models import SignupIn  # noqa: E402
 needs_db = pytest.mark.skipif(os.environ["DATABASE_URL"] == "postgresql://unused", reason="no DATABASE_URL")
 
 
-@pytest.fixture(scope="module")
-def db():
-    pool.open()
-    yield
-    pool.close()
-
-
 class CookieRequest:
     """Just enough of a Request for the auth helpers."""
     def __init__(self, cookies):
