@@ -164,6 +164,10 @@ button, input, select { font: inherit; color: inherit; }
 .members { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .members li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; min-height: 30px; }
 .members .btn { margin-left: auto; }
+.split { display: grid; gap: 16px; }
+.split h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.split .card { padding: 12px; gap: 8px; }
+.split .card-title { font-size: 14px; }
 
 /* Saved board */
 .board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
