@@ -109,6 +109,41 @@ function Progress({ teamId }) {
   )
 }
 
+function Target({ team, isOwner, onChanged }) {
+  const [state, setState] = useState({ busy: false, error: null })
+  const onSubmit = async (e) => {
+    e.preventDefault()
+    setState({ busy: true, error: null })
+    try {
+      const fullName = new FormData(e.currentTarget).get('full_name').trim()
+      await api(`/teams/${team.team_id}/target`, { method: 'PUT', body: { full_name: fullName || null } })
+      setState({ busy: false, error: null })
+      onChanged()
+    } catch (err) {
+      setState({ busy: false, error: err.message })
+    }
+  }
+  return (
+    <section className="section" aria-labelledby="target-h">
+      <h2 id="target-h">Target project</h2>
+      <p>
+        {team.target_repo
+          ? <>The team is contributing to <Link to={`/search?q=${encodeURIComponent(team.target_repo)}`}><strong>{team.target_repo}</strong></Link>.</>
+          : 'No project picked yet. Pick one to split its open issues across the team.'}
+      </p>
+      {isOwner && (
+        <form className="inline-form" onSubmit={onSubmit}>
+          <label className="sr-only" htmlFor="target">Repo (owner/name)</label>
+          <input className="input" id="target" name="full_name" key={team.target_repo} defaultValue={team.target_repo ?? ''}
+            placeholder="owner/name, e.g. pallets/flask" autoComplete="off" autoCapitalize="none" spellCheck={false} />
+          <button className="btn secondary" type="submit" disabled={state.busy}>Save</button>
+        </form>
+      )}
+      {state.error && <p className="error-text" role="alert">{state.error}</p>}
+    </section>
+  )
+}
+
 function DeleteTeam({ team, onDeleted }) {
   const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')
@@ -170,6 +205,7 @@ export default function Team() {
       </div>
       <div className="teams">
         <Members team={t} me={user.user_id} isOwner={isOwner} onChanged={team.reload} onLeft={() => navigate('/teams')} />
+        <Target team={t} isOwner={isOwner} onChanged={team.reload} />
         <Progress teamId={t.team_id} />
         {isOwner && <DeleteTeam team={t} onDeleted={() => navigate('/teams')} />}
       </div>
