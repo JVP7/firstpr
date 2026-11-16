@@ -5,7 +5,7 @@ import { api } from '../api'
 import { useLoad } from '../useLoad'
 import { Empty, ErrorState, Skeletons } from '../components'
 
-const STATUSES = [
+export const STATUSES = [
   ['interested', 'Interested'],
   ['working', 'Working'],
   ['pr_submitted', 'PR submitted'],

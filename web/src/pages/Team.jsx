@@ -5,6 +5,7 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import { useLoad } from '../useLoad'
 import { ErrorState, Skeletons } from '../components'
+import { STATUSES } from './Saved'
 
 function Members({ team, me, isOwner, onChanged, onLeft }) {
   const [error, setError] = useState(null)
@@ -59,6 +60,54 @@ function Members({ team, me, isOwner, onChanged, onLeft }) {
   )
 }
 
+function Progress({ teamId }) {
+  const saved = useLoad(() => api(`/teams/${teamId}/saved`), [teamId])
+  const [tab, setTab] = useState('interested')
+  if (saved.loading) return <Skeletons count={1} />
+  if (saved.error) return <ErrorState error={saved.error} onRetry={saved.reload} />
+  // The query returns only statuses someone has used; fill in the rest as empty columns.
+  const byStatus = Object.fromEntries(saved.data.map((g) => [g.status, g.issues]))
+
+  return (
+    <section aria-labelledby="progress-h" style={{ display: 'grid', gap: 12 }}>
+      <h2 id="progress-h" style={{ fontSize: 16 }}>Team progress</h2>
+      {saved.data.length === 0 && (
+        <p className="muted" style={{ fontSize: 14 }}>Nobody on the team has saved an issue yet. Issues members save show up here.</p>
+      )}
+      <div className="tabs" role="tablist" aria-label="Status">
+        {STATUSES.map(([value, label]) => (
+          <button key={value} role="tab" aria-selected={tab === value} onClick={() => setTab(value)}>
+            {label} {byStatus[value]?.length ?? 0}
+          </button>
+        ))}
+      </div>
+      <div className="board">
+        {STATUSES.map(([value, label]) => {
+          const items = byStatus[value] ?? []
+          return (
+            <section key={value} className="column" data-active={tab === value} aria-label={label}>
+              <h3><span>{label}</span><span>{items.length}</span></h3>
+              {items.length ? (
+                <ul className="list">
+                  {items.map((it) => (
+                    <li key={`${it.user_id}-${it.issue_id}`} className="card">
+                      <span className="repo-line"><span className="name">{it.repo}</span></span>
+                      <Link className="card-title" to={`/issues/${it.issue_id}`}>{it.title} <span className="num">#{it.number}</span></Link>
+                      <span className="repo-line">@{it.github_username}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="empty-col">None yet</p>
+              )}
+            </section>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export default function Team() {
   const { teamId } = useParams()
   const navigate = useNavigate()
@@ -78,6 +127,7 @@ export default function Team() {
       </div>
       <div className="teams">
         <Members team={t} me={user.user_id} isOwner={isOwner} onChanged={team.reload} onLeft={() => navigate('/teams')} />
+        <Progress teamId={t.team_id} />
       </div>
     </>
   )
