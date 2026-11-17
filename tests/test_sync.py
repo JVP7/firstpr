@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from ingest.sync import _cargo_crates, _fetch_issues
+from ingest.sync import _cargo_crates, _fetch_dependencies, _fetch_issues
 
 
 class FakeGitHub:
@@ -47,3 +47,37 @@ class FakeCargoGitHub:
 def test_cargo_workspace_reads_member_crates():
     root = '[workspace]\nmembers = ["crates/*", "tools/gen"]\n\n[workspace.dependencies]\nanyhow = "1"'
     assert _cargo_crates(FakeCargoGitHub(), "o/r", root) == {"anyhow", "serde", "clap", "quote"}
+
+
+class FakeRepoGitHub:
+    files = {
+        "pom.xml": "<project><dependencies><dependency><groupId>junit</groupId><artifactId>junit</artifactId>"
+                   "</dependency></dependencies></project>",
+        "gradle/libs.versions.toml": '[libraries]\nokhttp = "com.squareup.okhttp3:okhttp:4"',
+        "app.gemspec": 's.add_dependency "rack"',
+        "src/Api/Api.csproj": '<PackageReference Include="Serilog" />',
+    }
+
+    def __init__(self):
+        self.fetched = []
+
+    def get(self, path, params=None):
+        if path.endswith("/contents"):
+            body = [{"name": "pom.xml", "type": "file"}, {"name": "app.gemspec", "type": "file"},
+                    {"name": "README.md", "type": "file"}, {"name": "gradle", "type": "dir"}]
+        else:
+            assert path.endswith("/git/trees/main") and params == {"recursive": "1"}
+            body = {"tree": [{"path": "src/Api/Api.csproj", "type": "blob"}, {"path": "src", "type": "tree"}]}
+        return type("R", (), {"json": lambda _: body})()
+
+    def get_file(self, full_name, path):
+        self.fetched.append(path)
+        return self.files.get(path)
+
+
+def test_dependencies_come_only_from_files_the_repo_has():
+    gh = FakeRepoGitHub()
+    deps = _fetch_dependencies(gh, {"full_name": "o/r", "language": "C#", "default_branch": "main"})
+    assert deps == {("junit:junit", "maven"), ("com.squareup.okhttp3:okhttp", "maven"),
+                    ("rack", "rubygems"), ("serilog", "nuget")}
+    assert "README.md" not in gh.fetched and "package.json" not in gh.fetched
