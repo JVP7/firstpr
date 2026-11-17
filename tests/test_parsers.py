@@ -167,3 +167,16 @@ def test_composer_json_skips_platform_requirements():
     assert parse_composer_json(text) == {"laravel/framework", "phpunit/phpunit"}
     assert parse_composer_json("nope") == set()
     assert parse_composer_json('{"require": []}') == set()
+
+
+def test_nuget_reads_package_references_and_central_versions():
+    from ingest.parsers import parse_nuget
+    csproj = """<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Version="2.0" Include='Serilog'></PackageReference>
+    <ProjectReference Include="..\\Core\\Core.csproj" />
+  </ItemGroup>
+</Project>"""
+    assert parse_nuget(csproj) == {"newtonsoft.json", "serilog"}
+    assert parse_nuget('<PackageVersion Include="xunit" Version="2.6" />') == {"xunit"}
