@@ -72,7 +72,7 @@ export default function IssueDetail() {
             {packages.length > 40 && <span className="muted" style={{ fontSize: 13 }}>+{packages.length - 40} more</span>}
           </div>
         ) : (
-          <p className="muted" style={{ fontSize: 14 }}>No requirements.txt, pyproject.toml or package.json at the repo root.</p>
+          <p className="muted" style={{ fontSize: 14 }}>No requirements.txt, pyproject.toml, package.json, go.mod or Cargo.toml at the repo root.</p>
         )}
       </section>
       <section className="section" aria-labelledby="act-h">

@@ -63,3 +63,61 @@ def parse_package_json(text):
         if isinstance(deps, dict):
             names.update(name.strip().lower() for name in deps if name.strip())
     return names
+
+
+def parse_go_mod(text):
+    """Return the module paths a go.mod requires directly; `// indirect` ones are transitive, so skipped."""
+    names, in_block = set(), False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("require ("):
+            in_block = True
+            continue
+        if in_block and line.startswith(")"):
+            in_block = False
+            continue
+        if line.startswith("require "):
+            line = line[len("require "):].strip()
+        elif not in_block:
+            continue
+        if not line or line.startswith("//") or "// indirect" in line:
+            continue
+        names.add(line.split()[0].lower())  # GitHub paths are case-insensitive
+    return names
+
+
+def _cargo_tables(data):
+    """Every dependency table in a Cargo.toml, including workspace and target-specific ones."""
+    keys = ("dependencies", "dev-dependencies", "build-dependencies")
+    tables = [data.get(k, {}) for k in keys]
+    tables.append(data.get("workspace", {}).get("dependencies", {}))
+    for target in data.get("target", {}).values():
+        tables += [target.get(k, {}) for k in keys if isinstance(target, dict)]
+    return [t for t in tables if isinstance(t, dict)]
+
+
+def parse_cargo_toml(text):
+    """Return the crates.io crate names in a Cargo.toml. Local `path` crates are skipped; renamed
+    dependencies (`alias = { package = "real" }`) count under their real name."""
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return set()
+    names = set()
+    for table in _cargo_tables(data):
+        for name, spec in table.items():
+            if isinstance(spec, dict):
+                if "path" in spec:
+                    continue
+                name = spec.get("package", name)
+            names.add(name.lower().replace("_", "-"))  # crates.io treats - and _ as the same name
+    return names
+
+
+def cargo_workspace_members(text):
+    """The `[workspace] members` of a Cargo.toml: paths like "crates/core" or globs like "crates/*"."""
+    try:
+        members = tomllib.loads(text).get("workspace", {}).get("members", [])
+    except tomllib.TOMLDecodeError:
+        return []
+    return [m for m in members if isinstance(m, str)]
