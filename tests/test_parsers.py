@@ -1,4 +1,4 @@
-from ingest.parsers import parse_package_json, parse_requirements
+from ingest.parsers import parse_cargo_toml, parse_go_mod, parse_package_json, parse_requirements
 
 
 def test_requirements_handles_specifiers_extras_markers_and_options():
@@ -45,3 +45,50 @@ coverage = "*"
     from ingest.parsers import parse_pyproject
     assert parse_pyproject(text) == {"httpx", "pydantic", "mkdocs", "pytest", "sqlalchemy", "coverage"}
     assert parse_pyproject("not = [toml") == set()
+
+
+def test_go_mod_reads_direct_requirements_only():
+    text = """module github.com/me/app
+
+go 1.22
+
+require github.com/Sirupsen/logrus v1.9.3
+
+require (
+	github.com/spf13/cobra v1.8.0
+	// a comment
+	golang.org/x/sys v0.20.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1
+)
+
+replace github.com/x/y => ../y
+"""
+    assert parse_go_mod(text) == {"github.com/sirupsen/logrus", "github.com/spf13/cobra", "gopkg.in/yaml.v3"}
+
+
+def test_cargo_toml_reads_every_dependency_table():
+    text = """
+[package]
+name = "app"
+
+[dependencies]
+serde = "1"
+serde_json = { version = "1" }
+tokio_alias = { version = "1", package = "tokio" }
+local-crate = { path = "../local" }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[target.'cfg(windows)'.dependencies]
+winapi = "0.3"
+
+[workspace.dependencies]
+anyhow = "1"
+"""
+    assert parse_cargo_toml(text) == {"serde", "serde-json", "tokio", "criterion", "winapi", "anyhow"}
+
+
+def test_new_parsers_tolerate_bad_input():
+    assert parse_cargo_toml("not = = toml") == set()
+    assert parse_go_mod("") == set()
