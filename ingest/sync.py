@@ -8,7 +8,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from ingest.parsers import parse_package_json, parse_pyproject, parse_requirements
+from ingest.parsers import parse_cargo_toml, parse_go_mod, parse_package_json, parse_pyproject, parse_requirements
 
 log = logging.getLogger(__name__)
 
@@ -84,6 +84,12 @@ def _fetch_dependencies(gh, full_name):
     text = gh.get_file(full_name, "package.json")
     if text:
         deps |= {(name, "npm") for name in parse_package_json(text)}
+    text = gh.get_file(full_name, "go.mod")
+    if text:
+        deps |= {(name, "go") for name in parse_go_mod(text)}
+    text = gh.get_file(full_name, "Cargo.toml")
+    if text:
+        deps |= {(name, "cargo") for name in parse_cargo_toml(text)}
     return deps
 
 
