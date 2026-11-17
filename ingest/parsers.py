@@ -3,6 +3,7 @@
 import json
 import re
 import tomllib
+from xml.etree import ElementTree
 
 # Name at the start of a requirement line, per PEP 508.
 _REQ_NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
@@ -121,3 +122,52 @@ def cargo_workspace_members(text):
     except tomllib.TOMLDecodeError:
         return []
     return [m for m in members if isinstance(m, str)]
+
+
+def _local(tag):
+    return tag.rsplit("}", 1)[-1]  # drop the XML namespace
+
+
+def parse_pom(text):
+    """Return "groupid:artifactid" for the dependencies and managed dependencies of a Maven pom.xml.
+    Coordinates built from ${properties} are usually the project's own modules, so they're skipped."""
+    try:
+        root = ElementTree.fromstring(text)
+    except ElementTree.ParseError:
+        return set()
+    sections = [root] + [child for child in root if _local(child.tag) == "dependencyManagement"]
+    names = set()
+    for section in sections:
+        for deps in (child for child in section if _local(child.tag) == "dependencies"):
+            for dep in deps:
+                fields = {_local(f.tag): (f.text or "").strip() for f in dep}
+                group, artifact = fields.get("groupId", ""), fields.get("artifactId", "")
+                if group and artifact and "${" not in group + artifact:
+                    names.add(f"{group}:{artifact}".lower())
+    return names
+
+
+# A Gradle configuration (implementation, testImplementation, api, kapt, classpath...) followed by "group:artifact".
+_GRADLE_DEP = re.compile(
+    r"\b\w*(?:[Ii]mplementation|[Aa]pi|[Cc]ompileOnly|[Rr]untimeOnly|[Pp]rocessor|kapt|ksp|classpath)"
+    r"""\s*\(?\s*(?:platform\s*\(\s*)?["']([\w.-]+):([\w.-]+)""")
+
+
+def parse_gradle(text):
+    """Return "group:artifact" for string-notation dependencies in a build.gradle or build.gradle.kts."""
+    return {f"{group}:{artifact}".lower() for group, artifact in _GRADLE_DEP.findall(text)}
+
+
+def parse_gradle_catalog(text):
+    """Return "group:artifact" for the [libraries] of a Gradle version catalog (gradle/libs.versions.toml)."""
+    try:
+        libraries = tomllib.loads(text).get("libraries", {})
+    except tomllib.TOMLDecodeError:
+        return set()
+    names = set()
+    for spec in libraries.values():
+        if isinstance(spec, dict):
+            spec = spec.get("module") or f"{spec.get('group', '')}:{spec.get('name', '')}"
+        if isinstance(spec, str) and spec.count(":") >= 1 and not spec.startswith(":") and not spec.endswith(":"):
+            names.add(":".join(spec.split(":")[:2]).lower())
+    return names
