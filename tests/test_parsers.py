@@ -92,3 +92,50 @@ anyhow = "1"
 def test_new_parsers_tolerate_bad_input():
     assert parse_cargo_toml("not = = toml") == set()
     assert parse_go_mod("") == set()
+
+
+def test_pom_reads_dependencies_and_managed_ones_but_not_plugins_or_own_modules():
+    from ingest.parsers import parse_pom
+    text = """<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <dependencyManagement><dependencies>
+    <dependency><groupId>org.junit</groupId><artifactId>junit-bom</artifactId><scope>import</scope></dependency>
+  </dependencies></dependencyManagement>
+  <dependencies>
+    <dependency><groupId>com.Google.Guava</groupId><artifactId>guava</artifactId></dependency>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>my-core</artifactId></dependency>
+  </dependencies>
+  <build><plugins><plugin><dependencies>
+    <dependency><groupId>org.ow2.asm</groupId><artifactId>asm</artifactId></dependency>
+  </dependencies></plugin></plugins></build>
+</project>"""
+    assert parse_pom(text) == {"org.junit:junit-bom", "com.google.guava:guava"}
+    assert parse_pom("<not xml") == set()
+
+
+def test_gradle_reads_groovy_and_kotlin_string_notation():
+    from ingest.parsers import parse_gradle
+    text = """
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    api(platform("org.springframework.boot:spring-boot-dependencies:3.2.0"))
+    implementation(project(":core"))
+    implementation(libs.retrofit)
+}
+version = "1.0:2"
+"""
+    assert parse_gradle(text) == {"com.squareup.okhttp3:okhttp", "org.junit.jupiter:junit-jupiter",
+                                  "org.springframework.boot:spring-boot-dependencies"}
+
+
+def test_gradle_catalog_reads_all_three_library_forms():
+    from ingest.parsers import parse_gradle_catalog
+    text = """
+[versions]
+retrofit = "2.9.0"
+[libraries]
+okhttp = "com.squareup.okhttp3:okhttp:4.12.0"
+retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+junit = { group = "junit", name = "junit", version = "4.13" }
+"""
+    assert parse_gradle_catalog(text) == {"com.squareup.okhttp3:okhttp", "com.squareup.retrofit2:retrofit", "junit:junit"}
