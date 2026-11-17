@@ -211,3 +211,61 @@ _NUGET = re.compile(r"""<Package(?:Reference|Version)\b[^>]*?\bInclude\s*=\s*["'
 def parse_nuget(text):
     """Return the NuGet package IDs referenced by a .csproj or Directory.Packages.props."""
     return {name.strip().lower() for name in _NUGET.findall(text)}
+
+
+def normalize_c(name):
+    """vcpkg, Conan, CMake and Meson spell the same library differently (nlohmann_json, nlohmann-json, ZLIB)."""
+    return name.strip().lower().replace("_", "-")
+
+
+def parse_vcpkg_json(text):
+    """Return the port names in a vcpkg.json manifest."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return set()
+    deps = data.get("dependencies", []) if isinstance(data, dict) else []
+    names = {d if isinstance(d, str) else d.get("name", "") for d in deps if isinstance(d, (str, dict))}
+    return {normalize_c(n) for n in names if isinstance(n, str) and n}
+
+
+_CONAN_REF = re.compile(r"""["']?([A-Za-z0-9_.+-]+)/[^\s"'@]+""")
+
+
+def parse_conanfile_txt(text):
+    """Return the package names under [requires] in a conanfile.txt ("zlib/1.3" -> "zlib")."""
+    names, section = set(), None
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line.startswith("["):
+            section = line
+        elif line and section == "[requires]":
+            match = _CONAN_REF.match(line)
+            if match:
+                names.add(normalize_c(match.group(1)))
+    return names
+
+
+def parse_conanfile_py(text):
+    """Return the package names a conanfile.py requires, from `requires = ...` and self.requires(...)."""
+    names = set()
+    for line in text.splitlines():
+        if re.search(r"\brequires\b", line) and "tool_requires" not in line and "build_requires" not in line:
+            names.update(normalize_c(n) for n in re.findall(r"""["']([A-Za-z0-9_.+-]+)/[^"']+["']""", line))
+    return names
+
+
+# CMake modules for build tools rather than libraries; nearly every project has them, so they'd only add noise.
+_CMAKE_TOOLS = {"threads", "pkgconfig", "git", "doxygen", "python", "python3", "perl", "bison", "flex", "sphinx"}
+_FIND_PACKAGE = re.compile(r"^\s*find_package\s*\(\s*([A-Za-z0-9_.+-]+)", re.I | re.M)
+_MESON_DEP = re.compile(r"""\bdependency\s*\(\s*["']([^"']+)["']""")
+
+
+def parse_cmake(text):
+    """Return the libraries a CMakeLists.txt finds with find_package()."""
+    return {normalize_c(n) for n in _FIND_PACKAGE.findall(text)} - _CMAKE_TOOLS
+
+
+def parse_meson(text):
+    """Return the libraries a meson.build asks for with dependency()."""
+    return {normalize_c(n) for n in _MESON_DEP.findall(text)} - _CMAKE_TOOLS
