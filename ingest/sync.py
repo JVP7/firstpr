@@ -8,7 +8,8 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from ingest.parsers import cargo_workspace_members, parse_cargo_toml, parse_go_mod, parse_package_json, parse_pyproject, parse_requirements
+from ingest import parsers
+from ingest.parsers import cargo_workspace_members, parse_cargo_toml
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +23,29 @@ COMMENT_PAGES = 5
 PR_PAGES = 5
 HISTORY_DAYS = 90
 CARGO_MEMBERS = 15  # workspace member Cargo.tomls read per repo; big workspaces have hundreds
+CSPROJ_FILES = 15
+
+# Dependency files read when they're in the repo root, by file name, with their ecosystem and parser.
+MANIFESTS = {
+    "requirements.txt": ("pypi", parsers.parse_requirements),
+    "pyproject.toml": ("pypi", parsers.parse_pyproject),
+    "package.json": ("npm", parsers.parse_package_json),
+    "go.mod": ("go", parsers.parse_go_mod),
+    "Cargo.toml": ("cargo", parsers.parse_cargo_toml),
+    "pom.xml": ("maven", parsers.parse_pom),
+    "build.gradle": ("maven", parsers.parse_gradle),
+    "build.gradle.kts": ("maven", parsers.parse_gradle),
+    "libs.versions.toml": ("maven", parsers.parse_gradle_catalog),
+    "Gemfile": ("rubygems", parsers.parse_gemfile),
+    "composer.json": ("packagist", parsers.parse_composer_json),
+    "Directory.Packages.props": ("nuget", parsers.parse_nuget),
+    "vcpkg.json": ("c/c++", parsers.parse_vcpkg_json),
+    "conanfile.txt": ("c/c++", parsers.parse_conanfile_txt),
+    "conanfile.py": ("c/c++", parsers.parse_conanfile_py),
+    "CMakeLists.txt": ("c/c++", parsers.parse_cmake),
+    "meson.build": ("c/c++", parsers.parse_meson),
+}
+MANIFEST_SUFFIXES = {".gemspec": ("rubygems", parsers.parse_gemspec), ".csproj": ("nuget", parsers.parse_nuget)}
 
 
 def sync_repo(gh, conn, full_name, issues=True):
@@ -40,7 +64,7 @@ def fetch_repo(gh, full_name, issues=True, since=None):
         return None
     repo = resp.json()
     full_name = repo["full_name"]  # follows renames
-    data = {"repo": repo, "deps": _fetch_dependencies(gh, full_name), "issues": issues}
+    data = {"repo": repo, "deps": _fetch_dependencies(gh, repo), "issues": issues}
     if issues:
         data["labels"] = list(gh.paginate(f"/repos/{full_name}/labels"))
         data["open_issues"] = _fetch_issues(gh, full_name, data["labels"], since)
@@ -74,24 +98,40 @@ def table_counts(conn):
 
 # --- GitHub fetches -------------------------------------------------------
 
-def _fetch_dependencies(gh, full_name):
+def _manifest(path):
+    """(ecosystem, parser) for a dependency file path, or None if we don't read that file."""
+    name = path.rsplit("/", 1)[-1]
+    return MANIFESTS.get(name) or next((m for suffix, m in MANIFEST_SUFFIXES.items() if name.endswith(suffix)), None)
+
+
+def _fetch_dependencies(gh, repo):
+    full_name = repo["full_name"]
+    # One listing of the root instead of a request per manifest type, most of which would 404.
+    resp = gh.get(f"/repos/{full_name}/contents")
+    listing = resp.json() if resp is not None else []
+    root = {entry["name"]: entry["type"] for entry in listing} if isinstance(listing, list) else {}
+    paths = [name for name, kind in root.items() if kind == "file" and _manifest(name)]
+    if root.get("gradle") == "dir":
+        paths.append("gradle/libs.versions.toml")
+    if repo["language"] == "C#":  # .csproj files live in project folders, not the root
+        paths += _csproj_paths(gh, repo)
+
     deps = set()
-    text = gh.get_file(full_name, "requirements.txt")
-    if text:
-        deps |= {(name, "pypi") for name in parse_requirements(text)}
-    text = gh.get_file(full_name, "pyproject.toml")
-    if text:
-        deps |= {(name, "pypi") for name in parse_pyproject(text)}
-    text = gh.get_file(full_name, "package.json")
-    if text:
-        deps |= {(name, "npm") for name in parse_package_json(text)}
-    text = gh.get_file(full_name, "go.mod")
-    if text:
-        deps |= {(name, "go") for name in parse_go_mod(text)}
-    text = gh.get_file(full_name, "Cargo.toml")
-    if text:
-        deps |= {(name, "cargo") for name in _cargo_crates(gh, full_name, text)}
+    for path in dict.fromkeys(paths):
+        text = gh.get_file(full_name, path)
+        if text:
+            ecosystem, parse = _manifest(path)
+            names = _cargo_crates(gh, full_name, text) if path == "Cargo.toml" else parse(text)
+            deps |= {(name, ecosystem) for name in names}
     return deps
+
+
+def _csproj_paths(gh, repo):
+    """The CSPROJ_FILES shallowest .csproj paths in the repo, from one recursive tree listing."""
+    resp = gh.get(f"/repos/{repo['full_name']}/git/trees/{repo['default_branch']}", {"recursive": "1"})
+    tree = resp.json().get("tree", []) if resp is not None else []
+    paths = [e["path"] for e in tree if e["type"] == "blob" and e["path"].endswith(".csproj")]
+    return sorted(paths, key=lambda p: (p.count("/"), p))[:CSPROJ_FILES]
 
 
 def _cargo_crates(gh, full_name, text):

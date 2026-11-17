@@ -1,6 +1,7 @@
 # Re-syncs every seed repo from GitHub once a day: new issues, issues closed or assigned since the
-# last run, comments and pull requests, then refreshes repo_responsiveness. About 6,000 GitHub
-# requests, so it can wait out the hourly limit; the timeout leaves room for that.
+# last run, comments and pull requests, then refreshes repo_responsiveness. 1,200 repos take about
+# 3.5 hours with waits for the hourly API limit, so the timeout is GitHub's 6-hour maximum; a run cut
+# off anyway resumes the next day, because seed_load syncs the least recently synced repos first.
 name: Refresh data
 
 on:
@@ -17,7 +18,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

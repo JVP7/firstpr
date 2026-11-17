@@ -47,6 +47,12 @@ def main():
 
     gh = GitHubClient()
     conn = connect()
+    if not args.repo:
+        # Least recently synced first, so a run cut off by the job timeout resumes where it stopped.
+        synced = dict(conn.execute("SELECT lower(full_name), extract(epoch FROM last_synced_at) FROM repos "
+                                   "WHERE last_synced_at IS NOT NULL").fetchall())
+        conn.commit()  # end the read transaction so sync_repo's transactions aren't savepoints
+        names.sort(key=lambda name: synced.get(name.lower(), 0))
     failed = []
     start = time.monotonic()
     for i, name in enumerate(names, 1):

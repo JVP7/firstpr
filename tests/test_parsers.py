@@ -92,3 +92,114 @@ anyhow = "1"
 def test_new_parsers_tolerate_bad_input():
     assert parse_cargo_toml("not = = toml") == set()
     assert parse_go_mod("") == set()
+
+
+def test_pom_reads_dependencies_and_managed_ones_but_not_plugins_or_own_modules():
+    from ingest.parsers import parse_pom
+    text = """<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <dependencyManagement><dependencies>
+    <dependency><groupId>org.junit</groupId><artifactId>junit-bom</artifactId><scope>import</scope></dependency>
+  </dependencies></dependencyManagement>
+  <dependencies>
+    <dependency><groupId>com.Google.Guava</groupId><artifactId>guava</artifactId></dependency>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>my-core</artifactId></dependency>
+  </dependencies>
+  <build><plugins><plugin><dependencies>
+    <dependency><groupId>org.ow2.asm</groupId><artifactId>asm</artifactId></dependency>
+  </dependencies></plugin></plugins></build>
+</project>"""
+    assert parse_pom(text) == {"org.junit:junit-bom", "com.google.guava:guava"}
+    assert parse_pom("<not xml") == set()
+
+
+def test_gradle_reads_groovy_and_kotlin_string_notation():
+    from ingest.parsers import parse_gradle
+    text = """
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    api(platform("org.springframework.boot:spring-boot-dependencies:3.2.0"))
+    implementation(project(":core"))
+    implementation(libs.retrofit)
+}
+version = "1.0:2"
+"""
+    assert parse_gradle(text) == {"com.squareup.okhttp3:okhttp", "org.junit.jupiter:junit-jupiter",
+                                  "org.springframework.boot:spring-boot-dependencies"}
+
+
+def test_gradle_catalog_reads_all_three_library_forms():
+    from ingest.parsers import parse_gradle_catalog
+    text = """
+[versions]
+retrofit = "2.9.0"
+[libraries]
+okhttp = "com.squareup.okhttp3:okhttp:4.12.0"
+retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+junit = { group = "junit", name = "junit", version = "4.13" }
+"""
+    assert parse_gradle_catalog(text) == {"com.squareup.okhttp3:okhttp", "com.squareup.retrofit2:retrofit", "junit:junit"}
+
+
+def test_gemfile_and_gemspec():
+    from ingest.parsers import parse_gemfile, parse_gemspec
+    gemfile = """source "https://rubygems.org"
+gemspec
+gem "Rails", "~> 7.1"
+  gem 'rspec-rails', group: :test
+# gem "commented-out"
+group :dev do
+  gem("pry")
+end
+"""
+    assert parse_gemfile(gemfile) == {"rails", "rspec-rails", "pry"}
+    spec = """Gem::Specification.new do |s|
+  s.add_dependency "rack", ">= 2"
+  s.add_runtime_dependency('thor')
+  s.add_development_dependency "rake"
+end"""
+    assert parse_gemspec(spec) == {"rack", "thor", "rake"}
+
+
+def test_composer_json_skips_platform_requirements():
+    from ingest.parsers import parse_composer_json
+    text = '{"require": {"php": ">=8.1", "ext-json": "*", "Laravel/Framework": "^11"}, "require-dev": {"phpunit/phpunit": "^10"}}'
+    assert parse_composer_json(text) == {"laravel/framework", "phpunit/phpunit"}
+    assert parse_composer_json("nope") == set()
+    assert parse_composer_json('{"require": []}') == set()
+
+
+def test_nuget_reads_package_references_and_central_versions():
+    from ingest.parsers import parse_nuget
+    csproj = """<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Version="2.0" Include='Serilog'></PackageReference>
+    <ProjectReference Include="..\\Core\\Core.csproj" />
+  </ItemGroup>
+</Project>"""
+    assert parse_nuget(csproj) == {"newtonsoft.json", "serilog"}
+    assert parse_nuget('<PackageVersion Include="xunit" Version="2.6" />') == {"xunit"}
+
+
+def test_c_and_cpp_manifests_share_one_name_form():
+    from ingest.parsers import parse_cmake, parse_conanfile_py, parse_conanfile_txt, parse_meson, parse_vcpkg_json
+    assert parse_vcpkg_json('{"dependencies": ["fmt", {"name": "nlohmann-json", "features": []}]}') == {"fmt", "nlohmann-json"}
+    assert parse_vcpkg_json("[]") == set()
+    conan_txt = "[requires]\nzlib/1.3.1\nboost/1.84.0@user/stable # comment\n\n[generators]\nCMakeDeps\n"
+    assert parse_conanfile_txt(conan_txt) == {"zlib", "boost"}
+    conan_py = """class App(ConanFile):
+    requires = "openssl/3.2.0", "spdlog/1.13.0"
+    tool_requires = "cmake/3.28.1"
+    def requirements(self):
+        self.requires("gtest/1.14.0")
+"""
+    assert parse_conanfile_py(conan_py) == {"openssl", "spdlog", "gtest"}
+    cmake = """cmake_minimum_required(VERSION 3.16)
+find_package(Threads REQUIRED)
+find_package(nlohmann_json 3.2 REQUIRED)
+  FIND_PACKAGE(ZLIB)
+# find_package(Commented)
+"""
+    assert parse_cmake(cmake) == {"nlohmann-json", "zlib"}
+    assert parse_meson("glib = dependency('glib-2.0')\nthreads = dependency('threads')") == {"glib-2.0"}

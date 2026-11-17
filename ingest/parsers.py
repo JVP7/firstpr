@@ -3,6 +3,7 @@
 import json
 import re
 import tomllib
+from xml.etree import ElementTree
 
 # Name at the start of a requirement line, per PEP 508.
 _REQ_NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
@@ -121,3 +122,150 @@ def cargo_workspace_members(text):
     except tomllib.TOMLDecodeError:
         return []
     return [m for m in members if isinstance(m, str)]
+
+
+def _local(tag):
+    return tag.rsplit("}", 1)[-1]  # drop the XML namespace
+
+
+def parse_pom(text):
+    """Return "groupid:artifactid" for the dependencies and managed dependencies of a Maven pom.xml.
+    Coordinates built from ${properties} are usually the project's own modules, so they're skipped."""
+    try:
+        root = ElementTree.fromstring(text)
+    except ElementTree.ParseError:
+        return set()
+    sections = [root] + [child for child in root if _local(child.tag) == "dependencyManagement"]
+    names = set()
+    for section in sections:
+        for deps in (child for child in section if _local(child.tag) == "dependencies"):
+            for dep in deps:
+                fields = {_local(f.tag): (f.text or "").strip() for f in dep}
+                group, artifact = fields.get("groupId", ""), fields.get("artifactId", "")
+                if group and artifact and "${" not in group + artifact:
+                    names.add(f"{group}:{artifact}".lower())
+    return names
+
+
+# A Gradle configuration (implementation, testImplementation, api, kapt, classpath...) followed by "group:artifact".
+_GRADLE_DEP = re.compile(
+    r"\b\w*(?:[Ii]mplementation|[Aa]pi|[Cc]ompileOnly|[Rr]untimeOnly|[Pp]rocessor|kapt|ksp|classpath)"
+    r"""\s*\(?\s*(?:platform\s*\(\s*)?["']([\w.-]+):([\w.-]+)""")
+
+
+def parse_gradle(text):
+    """Return "group:artifact" for string-notation dependencies in a build.gradle or build.gradle.kts."""
+    return {f"{group}:{artifact}".lower() for group, artifact in _GRADLE_DEP.findall(text)}
+
+
+def parse_gradle_catalog(text):
+    """Return "group:artifact" for the [libraries] of a Gradle version catalog (gradle/libs.versions.toml)."""
+    try:
+        libraries = tomllib.loads(text).get("libraries", {})
+    except tomllib.TOMLDecodeError:
+        return set()
+    names = set()
+    for spec in libraries.values():
+        if isinstance(spec, dict):
+            spec = spec.get("module") or f"{spec.get('group', '')}:{spec.get('name', '')}"
+        if isinstance(spec, str) and spec.count(":") >= 1 and not spec.startswith(":") and not spec.endswith(":"):
+            names.add(":".join(spec.split(":")[:2]).lower())
+    return names
+
+
+_GEM = re.compile(r"""^\s*gem\s*\(?\s*["']([^"']+)["']""", re.M)
+_GEMSPEC_DEP = re.compile(r"""\badd_(?:runtime_|development_)?dependency\s*\(?\s*["']([^"']+)["']""")
+
+
+def parse_gemfile(text):
+    """Return the gem names in a Gemfile."""
+    return {name.lower() for name in _GEM.findall(text)}
+
+
+def parse_gemspec(text):
+    """Return the gem names a .gemspec depends on (runtime and development)."""
+    return {name.lower() for name in _GEMSPEC_DEP.findall(text)}
+
+
+def parse_composer_json(text):
+    """Return the Packagist "vendor/package" names in a composer.json (require + require-dev). Platform
+    requirements like php and ext-json have no vendor, so the slash check drops them."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    names = set()
+    for key in ("require", "require-dev"):
+        deps = data.get(key)
+        if isinstance(deps, dict):
+            names.update(name.strip().lower() for name in deps if "/" in name)
+    return names
+
+
+# <PackageReference Include="X"> in .csproj files, <PackageVersion Include="X"> in Directory.Packages.props.
+_NUGET = re.compile(r"""<Package(?:Reference|Version)\b[^>]*?\bInclude\s*=\s*["']([^"']+)["']""", re.I)
+
+
+def parse_nuget(text):
+    """Return the NuGet package IDs referenced by a .csproj or Directory.Packages.props."""
+    return {name.strip().lower() for name in _NUGET.findall(text)}
+
+
+def normalize_c(name):
+    """vcpkg, Conan, CMake and Meson spell the same library differently (nlohmann_json, nlohmann-json, ZLIB)."""
+    return name.strip().lower().replace("_", "-")
+
+
+def parse_vcpkg_json(text):
+    """Return the port names in a vcpkg.json manifest."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return set()
+    deps = data.get("dependencies", []) if isinstance(data, dict) else []
+    names = {d if isinstance(d, str) else d.get("name", "") for d in deps if isinstance(d, (str, dict))}
+    return {normalize_c(n) for n in names if isinstance(n, str) and n}
+
+
+_CONAN_REF = re.compile(r"""["']?([A-Za-z0-9_.+-]+)/[^\s"'@]+""")
+
+
+def parse_conanfile_txt(text):
+    """Return the package names under [requires] in a conanfile.txt ("zlib/1.3" -> "zlib")."""
+    names, section = set(), None
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line.startswith("["):
+            section = line
+        elif line and section == "[requires]":
+            match = _CONAN_REF.match(line)
+            if match:
+                names.add(normalize_c(match.group(1)))
+    return names
+
+
+def parse_conanfile_py(text):
+    """Return the package names a conanfile.py requires, from `requires = ...` and self.requires(...)."""
+    names = set()
+    for line in text.splitlines():
+        if re.search(r"\brequires\b", line) and "tool_requires" not in line and "build_requires" not in line:
+            names.update(normalize_c(n) for n in re.findall(r"""["']([A-Za-z0-9_.+-]+)/[^"']+["']""", line))
+    return names
+
+
+# CMake modules for build tools rather than libraries; nearly every project has them, so they'd only add noise.
+_CMAKE_TOOLS = {"threads", "pkgconfig", "git", "doxygen", "python", "python3", "perl", "bison", "flex", "sphinx"}
+_FIND_PACKAGE = re.compile(r"^\s*find_package\s*\(\s*([A-Za-z0-9_.+-]+)", re.I | re.M)
+_MESON_DEP = re.compile(r"""\bdependency\s*\(\s*["']([^"']+)["']""")
+
+
+def parse_cmake(text):
+    """Return the libraries a CMakeLists.txt finds with find_package()."""
+    return {normalize_c(n) for n in _FIND_PACKAGE.findall(text)} - _CMAKE_TOOLS
+
+
+def parse_meson(text):
+    """Return the libraries a meson.build asks for with dependency()."""
+    return {normalize_c(n) for n in _MESON_DEP.findall(text)} - _CMAKE_TOOLS

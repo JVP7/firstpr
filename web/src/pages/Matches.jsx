@@ -100,7 +100,7 @@ export default function Matches() {
         <ErrorState error={matches.error} onRetry={matches.reload} />
       ) : !hasPackages ? (
         <Empty title="No packages to match yet">
-          <p>We didn't find a requirements.txt, pyproject.toml, package.json, go.mod or Cargo.toml in your public repos. Add a few packages you know above and matches show up here.</p>
+          <p>We didn't find a dependency file (like package.json, requirements.txt, pom.xml, Gemfile or Cargo.toml) in your public repos. Add a few packages you know above and matches show up here.</p>
         </Empty>
       ) : matches.data.length === 0 && selected.length > 0 ? (
         <Empty title={`No matches in ${selected.join(' or ')}`}>

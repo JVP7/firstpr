@@ -79,10 +79,11 @@ def resync_repos(request: Request, user=Depends(current_user)):
 def search_packages(q: str = Query(min_length=1, max_length=100), limit: int = Query(20, ge=1, le=50),
                     conn=Depends(get_conn)):
     pattern = q.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
-    # Go modules are full paths (github.com/spf13/cobra), so also match after the last slash.
+    # Go modules are full paths (github.com/spf13/cobra) and Maven names are group:artifact, so also
+    # match after a slash or colon.
     return conn.execute(
-        "SELECT package_id, name, ecosystem FROM packages WHERE name ILIKE %s OR name ILIKE %s "
-        "ORDER BY length(name), name LIMIT %s", (pattern, "%/" + pattern, limit)).fetchall()
+        "SELECT package_id, name, ecosystem FROM packages WHERE name ILIKE %s OR name ILIKE %s OR name ILIKE %s "
+        "ORDER BY length(name), name LIMIT %s", (pattern, "%/" + pattern, "%:" + pattern, limit)).fetchall()
 
 
 @router.post("/me/skills", status_code=201)
