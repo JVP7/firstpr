@@ -5,7 +5,8 @@ import { CheckIcon, ClockIcon, CommentDiscussionIcon, DotFillIcon, IssueOpenedIc
 // GitHub linguist colors for the languages in the seed list.
 const LANG_COLORS = {
   Python: '#3572A5', JavaScript: '#f1e05a', TypeScript: '#3178c6', 'Jupyter Notebook': '#DA5B0B', HTML: '#e34c26',
-  Go: '#00ADD8', Rust: '#dea584',
+  Go: '#00ADD8', Rust: '#dea584', Java: '#b07219', Kotlin: '#A97BFF', Ruby: '#701516', PHP: '#4F5D95',
+  'C#': '#178600', 'C++': '#f34b7d', C: '#555555',
 }
 const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
