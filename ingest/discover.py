@@ -22,16 +22,16 @@ MIN_BEGINNER_ISSUES = 5  # same bar as the hand-picked seed list
 ACTIVE_DAYS = 90
 
 
-def search_query(language, today=None):
+def search_query(language, today=None, min_issues=MIN_BEGINNER_ISSUES):
     pushed = (today or date.today()) - timedelta(days=ACTIVE_DAYS)
-    return (f"language:{language} good-first-issues:>={MIN_BEGINNER_ISSUES} "
+    return (f"language:{language} good-first-issues:>={min_issues} "
             f"archived:false fork:false pushed:>={pushed.isoformat()}")
 
 
-def discover(gh, language, count, known):
+def discover(gh, language, count, known, min_issues=MIN_BEGINNER_ISSUES):
     """The top `count` repos by stars matching the query, skipping names already in `known` (lowercase)."""
     found = []
-    for repo in gh.search("repositories", search_query(language), sort="stars", order="desc"):
+    for repo in gh.search("repositories", search_query(language, min_issues=min_issues), sort="stars", order="desc"):
         if repo["full_name"].lower() not in known:
             found.append(repo["full_name"])
             if len(found) == count:
@@ -43,6 +43,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--language", required=True, help="GitHub language name, e.g. Go or Rust")
     parser.add_argument("--count", type=int, default=100)
+    parser.add_argument("--min-issues", type=int, default=MIN_BEGINNER_ISSUES,
+                        help="minimum open beginner issues; lower it for languages with few matches")
     parser.add_argument("--dry-run", action="store_true", help="print the repos without changing the CSV")
     args = parser.parse_args()
     load_dotenv()
@@ -50,7 +52,7 @@ def main():
 
     with open(SEED_CSV, newline="") as f:
         known = {row["full_name"].lower() for row in csv.DictReader(f)}
-    names = discover(GitHubClient(), args.language, args.count, known)
+    names = discover(GitHubClient(), args.language, args.count, known, args.min_issues)
     for name in names:
         print(name)
     if not args.dry_run:
