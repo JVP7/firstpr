@@ -77,6 +77,9 @@ def add_member(team_id: int, body: TeamMemberIn, user=Depends(current_user), con
 def remove_member(team_id: int, user_id: int, user=Depends(current_user), conn=Depends(get_conn)):
     if user_id != user["user_id"]:
         _require_owner(conn, team_id, user["user_id"])
+    elif _role(conn, team_id, user_id) == "owner":
+        # A team must keep an owner; the owner deletes the team instead.
+        raise HTTPException(409, "Owners can't leave a team. Delete it instead.")
     if not run_file(conn, "basic/team_member_remove", team_id=team_id, user_id=user_id):
         raise HTTPException(404, "Not a member")
 
