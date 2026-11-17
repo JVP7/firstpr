@@ -180,3 +180,26 @@ def test_nuget_reads_package_references_and_central_versions():
 </Project>"""
     assert parse_nuget(csproj) == {"newtonsoft.json", "serilog"}
     assert parse_nuget('<PackageVersion Include="xunit" Version="2.6" />') == {"xunit"}
+
+
+def test_c_and_cpp_manifests_share_one_name_form():
+    from ingest.parsers import parse_cmake, parse_conanfile_py, parse_conanfile_txt, parse_meson, parse_vcpkg_json
+    assert parse_vcpkg_json('{"dependencies": ["fmt", {"name": "nlohmann-json", "features": []}]}') == {"fmt", "nlohmann-json"}
+    assert parse_vcpkg_json("[]") == set()
+    conan_txt = "[requires]\nzlib/1.3.1\nboost/1.84.0@user/stable # comment\n\n[generators]\nCMakeDeps\n"
+    assert parse_conanfile_txt(conan_txt) == {"zlib", "boost"}
+    conan_py = """class App(ConanFile):
+    requires = "openssl/3.2.0", "spdlog/1.13.0"
+    tool_requires = "cmake/3.28.1"
+    def requirements(self):
+        self.requires("gtest/1.14.0")
+"""
+    assert parse_conanfile_py(conan_py) == {"openssl", "spdlog", "gtest"}
+    cmake = """cmake_minimum_required(VERSION 3.16)
+find_package(Threads REQUIRED)
+find_package(nlohmann_json 3.2 REQUIRED)
+  FIND_PACKAGE(ZLIB)
+# find_package(Commented)
+"""
+    assert parse_cmake(cmake) == {"nlohmann-json", "zlib"}
+    assert parse_meson("glib = dependency('glib-2.0')\nthreads = dependency('threads')") == {"glib-2.0"}
