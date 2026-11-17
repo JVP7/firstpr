@@ -159,3 +159,11 @@ end
   s.add_development_dependency "rake"
 end"""
     assert parse_gemspec(spec) == {"rack", "thor", "rake"}
+
+
+def test_composer_json_skips_platform_requirements():
+    from ingest.parsers import parse_composer_json
+    text = '{"require": {"php": ">=8.1", "ext-json": "*", "Laravel/Framework": "^11"}, "require-dev": {"phpunit/phpunit": "^10"}}'
+    assert parse_composer_json(text) == {"laravel/framework", "phpunit/phpunit"}
+    assert parse_composer_json("nope") == set()
+    assert parse_composer_json('{"require": []}') == set()
