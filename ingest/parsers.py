@@ -185,3 +185,20 @@ def parse_gemfile(text):
 def parse_gemspec(text):
     """Return the gem names a .gemspec depends on (runtime and development)."""
     return {name.lower() for name in _GEMSPEC_DEP.findall(text)}
+
+
+def parse_composer_json(text):
+    """Return the Packagist "vendor/package" names in a composer.json (require + require-dev). Platform
+    requirements like php and ext-json have no vendor, so the slash check drops them."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    names = set()
+    for key in ("require", "require-dev"):
+        deps = data.get(key)
+        if isinstance(deps, dict):
+            names.update(name.strip().lower() for name in deps if "/" in name)
+    return names
