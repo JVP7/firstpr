@@ -8,7 +8,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from ingest.parsers import parse_cargo_toml, parse_go_mod, parse_package_json, parse_pyproject, parse_requirements
+from ingest.parsers import cargo_workspace_members, parse_cargo_toml, parse_go_mod, parse_package_json, parse_pyproject, parse_requirements
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ CHANGED_ISSUE_PAGES = 10  # issues of any state updated since the last sync
 COMMENT_PAGES = 5
 PR_PAGES = 5
 HISTORY_DAYS = 90
+CARGO_MEMBERS = 15  # workspace member Cargo.tomls read per repo; big workspaces have hundreds
 
 
 def sync_repo(gh, conn, full_name, issues=True):
@@ -89,8 +90,33 @@ def _fetch_dependencies(gh, full_name):
         deps |= {(name, "go") for name in parse_go_mod(text)}
     text = gh.get_file(full_name, "Cargo.toml")
     if text:
-        deps |= {(name, "cargo") for name in parse_cargo_toml(text)}
+        deps |= {(name, "cargo") for name in _cargo_crates(gh, full_name, text)}
     return deps
+
+
+def _cargo_crates(gh, full_name, text):
+    """Crates in the root Cargo.toml and, when it's a workspace, in its first CARGO_MEMBERS members,
+    since a workspace root often lists only member folders and keeps the dependencies in them."""
+    names = parse_cargo_toml(text)
+    for member in _cargo_member_dirs(gh, full_name, cargo_workspace_members(text))[:CARGO_MEMBERS]:
+        member_text = gh.get_file(full_name, f"{member}/Cargo.toml")
+        if member_text:
+            names |= parse_cargo_toml(member_text)
+    return names
+
+
+def _cargo_member_dirs(gh, full_name, members):
+    dirs = []
+    for member in members:
+        if member.endswith("/*"):  # a glob: list the folder
+            resp = gh.get(f"/repos/{full_name}/contents/{member[:-2]}")
+            if resp is not None and isinstance(resp.json(), list):
+                dirs += [entry["path"] for entry in resp.json() if entry.get("type") == "dir"]
+        elif "*" not in member:
+            dirs.append(member.rstrip("/"))
+        if len(dirs) >= CARGO_MEMBERS:
+            break
+    return dirs
 
 
 def _fetch_issues(gh, full_name, labels, since=None):

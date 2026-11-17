@@ -112,3 +112,12 @@ def parse_cargo_toml(text):
                 name = spec.get("package", name)
             names.add(name.lower().replace("_", "-"))  # crates.io treats - and _ as the same name
     return names
+
+
+def cargo_workspace_members(text):
+    """The `[workspace] members` of a Cargo.toml: paths like "crates/core" or globs like "crates/*"."""
+    try:
+        members = tomllib.loads(text).get("workspace", {}).get("members", [])
+    except tomllib.TOMLDecodeError:
+        return []
+    return [m for m in members if isinstance(m, str)]
