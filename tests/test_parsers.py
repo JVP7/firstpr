@@ -139,3 +139,23 @@ retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit
 junit = { group = "junit", name = "junit", version = "4.13" }
 """
     assert parse_gradle_catalog(text) == {"com.squareup.okhttp3:okhttp", "com.squareup.retrofit2:retrofit", "junit:junit"}
+
+
+def test_gemfile_and_gemspec():
+    from ingest.parsers import parse_gemfile, parse_gemspec
+    gemfile = """source "https://rubygems.org"
+gemspec
+gem "Rails", "~> 7.1"
+  gem 'rspec-rails', group: :test
+# gem "commented-out"
+group :dev do
+  gem("pry")
+end
+"""
+    assert parse_gemfile(gemfile) == {"rails", "rspec-rails", "pry"}
+    spec = """Gem::Specification.new do |s|
+  s.add_dependency "rack", ">= 2"
+  s.add_runtime_dependency('thor')
+  s.add_development_dependency "rake"
+end"""
+    assert parse_gemspec(spec) == {"rack", "thor", "rake"}
