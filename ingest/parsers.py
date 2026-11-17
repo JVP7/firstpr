@@ -202,3 +202,12 @@ def parse_composer_json(text):
         if isinstance(deps, dict):
             names.update(name.strip().lower() for name in deps if "/" in name)
     return names
+
+
+# <PackageReference Include="X"> in .csproj files, <PackageVersion Include="X"> in Directory.Packages.props.
+_NUGET = re.compile(r"""<Package(?:Reference|Version)\b[^>]*?\bInclude\s*=\s*["']([^"']+)["']""", re.I)
+
+
+def parse_nuget(text):
+    """Return the NuGet package IDs referenced by a .csproj or Directory.Packages.props."""
+    return {name.strip().lower() for name in _NUGET.findall(text)}
