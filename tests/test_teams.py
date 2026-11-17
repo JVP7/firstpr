@@ -6,8 +6,10 @@ load_dotenv()
 os.environ.setdefault("DATABASE_URL", "postgresql://unused")
 
 import pytest  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
 
 from api.db import pool, run_file  # noqa: E402
+from api.routes.teams import remove_member  # noqa: E402
 
 needs_db = pytest.mark.skipif(os.environ["DATABASE_URL"] == "postgresql://unused", reason="no DATABASE_URL")
 REPO = 990000000001  # far above real GitHub IDs; everything is rolled back anyway
@@ -43,5 +45,23 @@ def test_split_gives_beginner_issues_to_the_least_familiar_member(db):
             by_user = {u: {a["issue_id"] for a in assigned if a["user_id"] == u} for u in (novice, expert)}
             assert len(by_user[novice]) == len(by_user[expert]) == 3
             assert beginner <= by_user[novice]
+        finally:
+            conn.rollback()
+
+
+@needs_db
+def test_owner_cannot_leave_but_a_member_can(db):
+    with pool.connection() as conn:
+        try:
+            [owner, member] = [run_file(conn, "basic/user_insert", github_username=name, email=f"{name}@leave.test",
+                                        password_hash="x")[0]["user_id"] for name in ("leave-owner", "leave-member")]
+            [team] = run_file(conn, "basic/team_insert", name="leave test", created_by=owner, target_repo_id=None)
+            run_file(conn, "basic/team_member_add", team_id=team["team_id"], user_id=owner, role="owner")
+            run_file(conn, "basic/team_member_add", team_id=team["team_id"], user_id=member, role="member")
+
+            with pytest.raises(HTTPException) as e:
+                remove_member(team["team_id"], owner, user={"user_id": owner}, conn=conn)
+            assert e.value.status_code == 409
+            remove_member(team["team_id"], member, user={"user_id": member}, conn=conn)
         finally:
             conn.rollback()
