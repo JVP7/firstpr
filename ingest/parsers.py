@@ -171,3 +171,17 @@ def parse_gradle_catalog(text):
         if isinstance(spec, str) and spec.count(":") >= 1 and not spec.startswith(":") and not spec.endswith(":"):
             names.add(":".join(spec.split(":")[:2]).lower())
     return names
+
+
+_GEM = re.compile(r"""^\s*gem\s*\(?\s*["']([^"']+)["']""", re.M)
+_GEMSPEC_DEP = re.compile(r"""\badd_(?:runtime_|development_)?dependency\s*\(?\s*["']([^"']+)["']""")
+
+
+def parse_gemfile(text):
+    """Return the gem names in a Gemfile."""
+    return {name.lower() for name in _GEM.findall(text)}
+
+
+def parse_gemspec(text):
+    """Return the gem names a .gemspec depends on (runtime and development)."""
+    return {name.lower() for name in _GEMSPEC_DEP.findall(text)}
