@@ -29,6 +29,15 @@ def connect():
                            sslmode=os.getenv("DB_SSLMODE", "require"))
 
 
+def tracked_names(conn):
+    """The seed list plus the repos loaded on demand for users."""
+    with open(SEED_CSV, newline="") as f:
+        names = [row["full_name"] for row in csv.DictReader(f)]
+    seed = {name.lower() for name in names}
+    return names + [r[0] for r in conn.execute("SELECT r.full_name FROM requested_repos q JOIN repos r USING (repo_id)")
+                    if r[0].lower() not in seed]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--limit", type=int, help="only load the first N repos")
@@ -40,14 +49,7 @@ def main():
 
     gh = GitHubClient()
     conn = connect()
-    if args.repo:
-        names = args.repo
-    else:
-        with open(SEED_CSV, newline="") as f:
-            names = [row["full_name"] for row in csv.DictReader(f)]
-        seed = {name.lower() for name in names}
-        names += [r[0] for r in conn.execute("SELECT r.full_name FROM requested_repos q JOIN repos r USING (repo_id)")
-                  if r[0].lower() not in seed]
+    names = args.repo or tracked_names(conn)
     names = names[: args.limit]
     if not args.repo:
         # Least recently synced first, so a run cut off by the job timeout resumes where it stopped.

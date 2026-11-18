@@ -1,0 +1,32 @@
+# Every hour, asks GitHub for issues changed in the 600 tracked repos checked longest ago, so an issue
+# closed, assigned or labeled on GitHub updates here within about 2 hours. Uses the workflow's own
+# token, whose 1,000 requests an hour are separate from the daily refresh's.
+name: Check issues
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-issues
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Check changed issues
+        run: python -m ingest.issue_check
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
