@@ -5,7 +5,7 @@ export default function Privacy() {
     <article className="prose">
       <div className="page-head">
         <h1>Privacy &amp; security</h1>
-        <p>What Starpull keeps about you, what it never keeps, and how to remove it. Last updated October 26, 2026.</p>
+        <p>What Starpull keeps about you, who handles it, and how to remove it. Last updated November 18, 2026.</p>
       </div>
 
       <section className="section">
@@ -15,7 +15,8 @@ export default function Privacy() {
           <li><strong>Your email</strong>, as a second way to log in.</li>
           <li><strong>A one-way hash of your password</strong> (bcrypt). Nobody, including us, can read the password back.</li>
           <li><strong>Your public repos and the packages they use</strong>, plus any packages you add yourself. This is how we find matching issues.</li>
-          <li><strong>The issues you save</strong> and their status, and any teams you join.</li>
+          <li><strong>The issues you save</strong> and their status, and any teams you join. Your teammates see your GitHub username and the issues you've saved.</li>
+          <li><strong>Your IP address, briefly.</strong> Login and signup attempts record it to stop password guessing. Those records are deleted after an hour.</li>
         </ul>
       </section>
 
@@ -27,6 +28,27 @@ export default function Privacy() {
           <li>Your private repos. We can't see them.</li>
           <li>Payment details. Starpull is free.</li>
         </ul>
+        <p>We don't sell your data, show ads, run analytics or tracking, or use AI on your data.</p>
+      </section>
+
+      <section className="section">
+        <h2>Who handles your data</h2>
+        <ul>
+          <li><strong>GitHub</strong> confirms who you are at sign-in and is where we read your public repos.</li>
+          <li><strong>Supabase</strong> hosts our database, which holds everything under "What we store".</li>
+          <li><strong>Render</strong> runs our server. Its logs, including the security log and IP addresses, are kept for 7 days.</li>
+          <li><strong>Vercel</strong> serves this website and, like any web host, sees your IP address when you visit.</li>
+          <li><strong>Have I Been Pwned</strong> checks new passwords against leaked ones. It receives only the first 5 characters of a scrambled (hashed) password.</li>
+        </ul>
+      </section>
+
+      <section className="section">
+        <h2>Cookies</h2>
+        <p>
+          One cookie keeps you logged in, and a short-lived one remembers your GitHub sign-in while you finish creating
+          an account. Both are needed for the site to work. There are no tracking or advertising cookies, so there's no
+          cookie banner.
+        </p>
       </section>
 
       <section className="section">
@@ -49,9 +71,22 @@ export default function Privacy() {
           immediately. Public information about open-source projects (issues, labels, stars) stays, because it isn't about you.
         </p>
         <p>
+          Account data stays until you delete your account. IP addresses used against password guessing are deleted after
+          an hour, and server logs after 7 days.
+        </p>
+        <p>
           GitHub keeps its own record that you approved Starpull, which is why signing in again skips GitHub's approval
           screen. Starpull can't remove it for you, because we don't keep your GitHub token. Revoke it yourself under{' '}
           <a href="https://github.com/settings/applications" target="_blank" rel="noreferrer">GitHub → Settings → Applications</a>.
+        </p>
+      </section>
+
+      <section className="section">
+        <h2>Age and contact</h2>
+        <p>
+          Starpull is for people 13 and older, the same minimum as GitHub. Questions about your data:{' '}
+          <a href="https://github.com/JVP7/firstpr/issues/new" target="_blank" rel="noreferrer">open an issue on GitHub</a>.
+          See also the <Link to="/terms">Terms of service</Link>.
         </p>
       </section>
     </article>
