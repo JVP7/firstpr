@@ -1,9 +1,9 @@
 import psycopg
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
 
 from api.auth import current_user, end_all_sessions, end_session, hash_password, require_password, set_session
 from api.db import get_conn, run_file
-from api.github_import import import_user_repos
+from api.github_import import import_user_repos, load_matching_repos
 from api.models import DeleteAccountIn, EmailIn, PasswordChangeIn, SkillIn
 from api.passwords import new_password_problem
 from api.security import resyncs, security_event
@@ -70,9 +70,11 @@ def delete_me(body: DeleteAccountIn, request: Request, response: Response,
 
 
 @router.post("/me/sync")
-def resync_repos(request: Request, user=Depends(current_user)):
+def resync_repos(request: Request, background: BackgroundTasks, user=Depends(current_user)):
     resyncs.check(user["user_id"], request)
-    return {"imported_repos": import_user_repos(user["user_id"], user["github_username"])}
+    repos = import_user_repos(user["user_id"], user["github_username"])
+    background.add_task(load_matching_repos, user["user_id"])
+    return {"imported_repos": repos}
 
 
 @router.get("/packages")
