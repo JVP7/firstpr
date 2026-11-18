@@ -22,16 +22,17 @@ MIN_BEGINNER_ISSUES = 5  # same bar as the hand-picked seed list
 ACTIVE_DAYS = 90
 
 
-def search_query(language, today=None, min_issues=MIN_BEGINNER_ISSUES):
+def search_query(qualifier, today=None, min_issues=MIN_BEGINNER_ISSUES):
+    """Repo search for `qualifier` ("language:Go", "topic:django") with active beginner issues."""
     pushed = (today or date.today()) - timedelta(days=ACTIVE_DAYS)
-    return (f"language:{language} good-first-issues:>={min_issues} "
+    return (f"{qualifier} good-first-issues:>={min_issues} "
             f"archived:false fork:false pushed:>={pushed.isoformat()}")
 
 
-def discover(gh, language, count, known, min_issues=MIN_BEGINNER_ISSUES):
+def discover(gh, qualifier, count, known, min_issues=MIN_BEGINNER_ISSUES):
     """The top `count` repos by stars matching the query, skipping names already in `known` (lowercase)."""
     found = []
-    for repo in gh.search("repositories", search_query(language, min_issues=min_issues), sort="stars", order="desc"):
+    for repo in gh.search("repositories", search_query(qualifier, min_issues=min_issues), sort="stars", order="desc"):
         if repo["full_name"].lower() not in known:
             found.append(repo["full_name"])
             if len(found) == count:
@@ -52,7 +53,7 @@ def main():
 
     with open(SEED_CSV, newline="") as f:
         known = {row["full_name"].lower() for row in csv.DictReader(f)}
-    names = discover(GitHubClient(), args.language, args.count, known, args.min_issues)
+    names = discover(GitHubClient(), f"language:{args.language}", args.count, known, args.min_issues)
     for name in names:
         print(name)
     if not args.dry_run:
