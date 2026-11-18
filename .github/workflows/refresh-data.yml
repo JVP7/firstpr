@@ -1,4 +1,4 @@
-# Re-syncs every seed repo from GitHub once a day: new issues, issues closed or assigned since the
+# Re-syncs every seed repo and every repo loaded on demand once a day: new issues, issues closed or assigned since the
 # last run, comments and pull requests, then refreshes repo_responsiveness. 1,200 repos take about
 # 3.5 hours with waits for the hourly API limit, so the timeout is GitHub's 6-hour maximum; a run cut
 # off anyway resumes the next day, because seed_load syncs the least recently synced repos first.
