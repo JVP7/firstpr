@@ -49,7 +49,10 @@ class RateLimiter:
     limits survive deploys and are shared across instances. Each call uses its own short
     connection, so a hit is recorded even when the request that caused it fails and rolls back."""
 
+    KEEP_SECONDS = 60 * 60  # the privacy page promises IP addresses here are gone after an hour
+
     def __init__(self, name, limit, window_seconds):
+        assert window_seconds <= self.KEEP_SECONDS, "a window longer than KEEP_SECONDS would lose hits it needs"
         self.name, self.limit, self.window = name, limit, window_seconds
 
     def blocked(self, subject):
@@ -63,9 +66,10 @@ class RateLimiter:
     def hit(self, subject):
         with pool.connection() as conn:
             conn.execute("INSERT INTO rate_limit_hits (limiter, subject) VALUES (%s, %s)", (self.name, str(subject)))
-            # Keep the table small: drop this subject's hits that fell out of the window.
-            conn.execute("DELETE FROM rate_limit_hits WHERE limiter = %s AND subject = %s "
-                         "AND at <= now() - make_interval(secs => %s)", (self.name, str(subject), self.window))
+            # Drop everyone's hits older than any window, not just this subject's, so an IP that
+            # never comes back doesn't stay stored.
+            conn.execute("DELETE FROM rate_limit_hits WHERE at <= now() - make_interval(secs => %s)",
+                         (self.KEEP_SECONDS,))
 
     def reset(self, subject):
         with pool.connection() as conn:
