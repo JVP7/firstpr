@@ -41,7 +41,7 @@ def import_user_repos(user_id, github_username):
 TOPIC_SEARCHES = 8      # GitHub searches per user; most of a user's packages aren't repo topics
 TOPICS_PER_USER = 4     # topics that found repos
 REPOS_PER_TOPIC = 3
-MIN_STARS = 100  # keeps out personal projects that happen to share a topic
+MIN_STARS = 250  # keeps out personal projects that happen to share a topic
 # Topics like "csv" span languages, so search only the languages that use the package's ecosystem.
 ECOSYSTEM_LANGUAGES = {
     "pypi": ["Python"], "npm": ["JavaScript", "TypeScript"], "go": ["Go"], "cargo": ["Rust"],
@@ -94,7 +94,7 @@ def load_matching_repos(user_id):
 
         found, topics = [], 0
         for qualifier, topic in pick_topics(packages):
-            names = discover(gh, f"{qualifier} stars:>={MIN_STARS}", REPOS_PER_TOPIC, known, min_issues=3)
+            names = discover(gh, f"{qualifier} stars:>={MIN_STARS}", REPOS_PER_TOPIC, known)  # seed list's bar: 5 beginner issues
             known.update(n.lower() for n in names)
             found += [(n, topic) for n in names]
             topics += bool(names)
