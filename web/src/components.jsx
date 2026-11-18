@@ -83,11 +83,15 @@ export function RepoLine({ repo, language, stars, pace }) {
   )
 }
 
+// Same pattern as the beginner filter in the SQL, so the label that made an issue match is never hidden behind "+N".
+const BEGINNER_LABEL = /good.?first|first.?timer|beginner|newcomer|starter|\beasy\b/i
+
 export function Labels({ labels, max = 3 }) {
   if (!labels?.length) return null
+  const sorted = [...labels].sort((a, b) => BEGINNER_LABEL.test(b) - BEGINNER_LABEL.test(a))
   return (
     <div className="labels">
-      {labels.slice(0, max).map((l) => <span key={l} className="label">{l}</span>)}
+      {sorted.slice(0, max).map((l) => <span key={l} className="label">{l}</span>)}
       {labels.length > max && <span className="label">+{labels.length - max}</span>}
     </div>
   )

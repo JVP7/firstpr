@@ -1,4 +1,5 @@
--- Example: user_id=1, languages=NULL (or '{Python,TypeScript}' to keep only those repo languages), limit=20.
+-- Example: user_id=1, languages=NULL (or '{Python,TypeScript}' to keep only those repo languages),
+-- beginner_only=false (true keeps issues with a good-first-issue style label), limit=20.
 -- Expected: The top <limit> open, unassigned issues ranked by 0.8 * Jaccard(user packages, repo packages)
 -- + 0.2 if the repo's language matches one of the user's repos, scaled by 0.75 to 1.25 with the repo's
 -- responsiveness (1.0 when unknown); only repos sharing a package qualify.
@@ -58,6 +59,10 @@ ranked AS (
         SELECT 1 FROM user_repos ur WHERE ur.user_id = :user_id AND ur.repo_id = r.repo_id
     )
       AND (CAST(:languages AS text[]) IS NULL OR r.primary_language = ANY (CAST(:languages AS text[])))
+      AND (NOT CAST(:beginner_only AS boolean) OR EXISTS (
+          SELECT 1 FROM issue_labels il JOIN labels l ON l.label_id = il.label_id
+          WHERE il.issue_id = i.issue_id
+            AND l.name ~* 'good.?first|first.?timer|beginner|newcomer|starter|\measy\M'))
 )
 SELECT issue_id, full_name, number, title, primary_language, stars, jaccard, language_match, score, shared_packages,
        responsiveness, reply_rate, median_reply_hours, merge_rate,
