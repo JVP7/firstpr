@@ -30,8 +30,8 @@ def search(q: str | None = Query(None, max_length=100), language: Languages = []
 
 
 @router.get("/languages")
-def tracked_languages(conn=Depends(get_conn)):
-    return run_file(conn, "advanced/tracked_languages")
+def tracked_languages(beginner_only: bool = False, conn=Depends(get_conn)):
+    return run_file(conn, "advanced/tracked_languages", beginner_only=beginner_only)
 
 
 @router.get("/{issue_id}")

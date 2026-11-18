@@ -9,7 +9,7 @@ export default function Search() {
   const q = params.get('q') ?? ''
   const beginner = params.get('beginner') === '1'
   const { selected, toggle, clear } = useLanguageParam()
-  const tracked = useLoad(() => api('/issues/languages'), [])
+  const tracked = useLoad(() => api(`/issues/languages?beginner_only=${beginner}`), [beginner])
   const query = new URLSearchParams({ q, beginner_only: beginner, limit: 50 })
   selected.forEach((l) => query.append('language', l))
   const results = useLoad(() => api(`/issues/search?${query}`), [query.toString()])
@@ -28,7 +28,7 @@ export default function Search() {
     <>
       <div className="page-head">
         <h1>Search issues</h1>
-        <p>Every open, unassigned issue across the 300 projects we track, newest first.</p>
+        <p>Every open, unassigned issue across the projects we track, newest first.</p>
       </div>
       <form className="search-form" onSubmit={onSubmit} role="search">
         <div className="field">
