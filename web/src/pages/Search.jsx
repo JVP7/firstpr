@@ -28,7 +28,7 @@ export default function Search() {
     <>
       <div className="page-head">
         <h1>Search issues</h1>
-        <p>Every open, unassigned issue across the 300 projects we track, newest first.</p>
+        <p>Every open, unassigned issue across the projects we track, newest first.</p>
       </div>
       <form className="search-form" onSubmit={onSubmit} role="search">
         <div className="field">
