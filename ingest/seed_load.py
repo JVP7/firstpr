@@ -70,6 +70,8 @@ def main():
     if conn.closed:
         conn = connect()
     conn.execute("REFRESH MATERIALIZED VIEW repo_responsiveness")
+    # The API clears these as people sign in; this covers days with no sign-ins.
+    conn.execute("DELETE FROM rate_limit_hits WHERE at <= now() - interval '1 hour'")
     conn.commit()
 
     log.info("Done in %.0fs: %d synced, %d failed %s",

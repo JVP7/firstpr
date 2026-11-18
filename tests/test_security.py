@@ -45,6 +45,17 @@ def test_rate_limiter_blocks_after_limit_and_resets(db):
 
 
 @needs_db
+def test_rate_limit_hits_from_ips_that_never_return_are_deleted(db):
+    other = f"gone-{uuid.uuid4()}"
+    with pool.connection() as conn:
+        conn.execute("INSERT INTO rate_limit_hits (limiter, subject, at) VALUES ('auth', %s, now() - interval '2 hours')",
+                     (other,))
+    security.RateLimiter(f"test-{uuid.uuid4()}", limit=2, window_seconds=60).hit("a")
+    with pool.connection() as conn:
+        assert conn.execute("SELECT count(*) AS n FROM rate_limit_hits WHERE subject = %s", (other,)).fetchone()["n"] == 0
+
+
+@needs_db
 def test_logout_revokes_the_token(db):
     name = f"zz-test-{uuid.uuid4().hex[:8]}"
     with pool.connection() as conn:
