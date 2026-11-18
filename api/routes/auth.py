@@ -5,13 +5,13 @@ from urllib.parse import urlencode
 
 import psycopg
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
 from api.auth import (check_password, clear_pending_github, current_user, end_session, hash_password,
                       pending_github, set_pending_github, set_session)
 from api.db import get_conn, pool, run_file
-from api.github_import import import_user_repos
+from api.github_import import import_user_repos, load_matching_repos
 from api.models import LoginIn, SignupIn
 from api.passwords import new_password_problem
 from api.security import auth_requests, client_ip, login_failures, security_event, signups
@@ -85,7 +85,7 @@ def github_callback(request: Request, code: str = "", state: str = "", error: st
 
 
 @router.post("/signup", status_code=201)
-def signup(body: SignupIn, request: Request, response: Response):
+def signup(body: SignupIn, request: Request, response: Response, background: BackgroundTasks):
     # The username comes from the OAuth-verified cookie, never from the request body.
     github_username = pending_github(request)
     if not github_username:
@@ -108,6 +108,7 @@ def signup(body: SignupIn, request: Request, response: Response):
     except Exception:
         log.exception("Repo import failed for user_id=%s", user["user_id"])
         repos = []
+    background.add_task(load_matching_repos, user["user_id"])
     clear_pending_github(response)
     set_session(response, user["user_id"])
     return {"user": user, "imported_repos": repos}
