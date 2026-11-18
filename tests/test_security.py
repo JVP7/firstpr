@@ -114,10 +114,18 @@ def test_csrf_rejects_foreign_origin_and_sets_headers():
     assert client.post("/x").status_code == 200  # no Origin: same-origin or non-browser client
 
 
-def test_password_limit_counts_bytes():
-    SignupIn(email="a@example.com", password="P!" + "p" * 70)
+def test_signup_requires_accepting_the_terms():
     with pytest.raises(ValidationError):
-        SignupIn(email="a@example.com", password="É!" + "é" * 40)  # 83 bytes, passes the other rules
+        SignupIn(email="a@example.com", password="Abcdefghij!k")
+    with pytest.raises(ValidationError):
+        SignupIn(email="a@example.com", password="Abcdefghij!k", accept_terms=False)
+    SignupIn(email="a@example.com", password="Abcdefghij!k", accept_terms=True)
+
+
+def test_password_limit_counts_bytes():
+    SignupIn(email="a@example.com", accept_terms=True, password="P!" + "p" * 70)
+    with pytest.raises(ValidationError):
+        SignupIn(email="a@example.com", accept_terms=True, password="É!" + "é" * 40)  # 83 bytes, passes the other rules
 
 
 def test_load_sql_converts_placeholders_but_not_casts():
@@ -161,10 +169,10 @@ def test_ending_all_sessions_rejects_older_tokens(db):
 ])
 def test_password_rules(password, ok):
     if ok:
-        SignupIn(email="a@example.com", password=password)
+        SignupIn(email="a@example.com", accept_terms=True, password=password)
     else:
         with pytest.raises(ValidationError):
-            SignupIn(email="a@example.com", password=password)
+            SignupIn(email="a@example.com", accept_terms=True, password=password)
 
 
 @pytest.mark.parametrize("password, problem", [
@@ -221,7 +229,7 @@ def test_validation_errors_never_echo_passwords():
     from api.main import app
     client = TestClient(app)  # no lifespan: validation fails before any database access
     secret = "Abcdefghi!j"
-    for path, body in (("/auth/signup", {"email": "a@example.com", "password": secret}),
+    for path, body in (("/auth/signup", {"email": "a@example.com", "password": secret, "accept_terms": True}),
                        ("/auth/login", {"login": "x", "password": secret * 30})):
         resp = client.post(path, json=body)
         assert resp.status_code == 422

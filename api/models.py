@@ -28,6 +28,8 @@ class SignupIn(BaseModel):
     # The GitHub username is not here: it comes from the OAuth-verified cookie.
     email: EmailStr
     password: Password
+    # The signup checkbox: 13 or older and agrees to the terms. Literal so a missing or unticked box fails.
+    accept_terms: Literal[True]
 
 
 class PasswordChangeIn(BaseModel):

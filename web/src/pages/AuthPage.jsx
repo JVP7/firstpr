@@ -32,6 +32,7 @@ export default function AuthPage({ mode }) {
   const onSubmit = async (e) => {
     e.preventDefault()
     const form = Object.fromEntries(new FormData(e.currentTarget))
+    if (signup) form.accept_terms = form.accept_terms === 'on'
     setBusy(true)
     setError(null)
     try {
@@ -86,6 +87,14 @@ export default function AuthPage({ mode }) {
                 <input className="input" id="email" name="email" type="email" required autoComplete="email" spellCheck={false} />
               </div>
               <NewPasswordField id="password" name="password" label="Password" username={pendingGithub} />
+              <label className="check">
+                <input type="checkbox" name="accept_terms" required />
+                <span>
+                  I'm 13 or older and agree to the{' '}
+                  <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and{' '}
+                  <a href="/privacy" target="_blank" rel="noreferrer">Privacy</a> policy.
+                </span>
+              </label>
             </>
           ) : (
             <>
