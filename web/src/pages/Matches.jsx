@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { XIcon } from '@primer/octicons-react'
 import { api } from '../api'
 import { useAuth } from '../auth'
@@ -76,9 +76,17 @@ function Stack({ me, onChange }) {
 export default function Matches() {
   const { user, refresh } = useAuth()
   const { selected, toggle, clear } = useLanguageParam()
+  const [params, setParams] = useSearchParams()
+  const beginner = params.get('beginner') === '1'
+  const setBeginner = (on) => {
+    const next = new URLSearchParams(params)
+    on ? next.set('beginner', '1') : next.delete('beginner')
+    setParams(next, { replace: true })
+  }
   const tracked = useLoad(() => api('/issues/languages'), [])
-  const query = selected.map((l) => `language=${encodeURIComponent(l)}`).join('&')
-  const matches = useLoad(() => api(`/issues/matches?${query}`), [user, query])
+  const query = new URLSearchParams({ beginner_only: beginner })
+  selected.forEach((l) => query.append('language', l))
+  const matches = useLoad(() => api(`/issues/matches?${query}`), [user, query.toString()])
   const hasPackages = user.repos.some((r) => r.package_count > 0) || user.skills.length > 0
   // Only languages the user has written in AND that tracked projects use; anything else could only come back empty.
   const mine = new Set(user.repos.map((r) => r.primary_language))
@@ -94,6 +102,12 @@ export default function Matches() {
       {languageOptions.length > 1 && (
         <LanguageFilter label="Your languages" options={languageOptions} selected={selected} onToggle={toggle} onClear={clear} />
       )}
+      <div className="search-options">
+        <label className="check">
+          <input type="checkbox" checked={beginner} onChange={(e) => setBeginner(e.target.checked)} />
+          Only issues with a beginner label (good first issue, help wanted…)
+        </label>
+      </div>
       {matches.loading ? (
         <Skeletons />
       ) : matches.error ? (
@@ -101,6 +115,11 @@ export default function Matches() {
       ) : !hasPackages ? (
         <Empty title="No packages to match yet">
           <p>We didn't find a dependency file (like package.json, requirements.txt, pom.xml, Gemfile or Cargo.toml) in your public repos. Add a few packages you know above and matches show up here.</p>
+        </Empty>
+      ) : matches.data.length === 0 && beginner ? (
+        <Empty title="No beginner issues match yet">
+          <p>None of the projects that use your packages have an open issue with a beginner label right now.</p>
+          <button className="btn secondary" onClick={() => setBeginner(false)}>Show all issues</button>
         </Empty>
       ) : matches.data.length === 0 && selected.length > 0 ? (
         <Empty title={`No matches in ${selected.join(' or ')}`}>
